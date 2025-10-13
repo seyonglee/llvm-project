@@ -8,13 +8,12 @@
  * - I will need to overwrite the Pre and Post functions though
  */
 
-//#include "check-declarations.cpp"
-//#include "check-declarations.h"
+// #include "check-declarations.cpp"
+// #include "check-declarations.h"
 //////#include "check-allocate-anthony.h" // TODO: make cleaner
 //////#include "check-allocate.h"
 //////#include "check.h"
-//#include "pointer-assignment-anthony.h" // TODO: make cleaner
-#include "flang/Support/Fortran.h"
+// #include "pointer-assignment-anthony.h" // TODO: make cleaner
 #include "flang/Common/idioms.h"
 #include "flang/Common/indirection.h"
 #include "flang/Frontend/CompilerInstance.h"
@@ -26,6 +25,7 @@
 #include "flang/Parser/parsing.h"
 #include "flang/Parser/tools.h"
 #include "flang/Parser/unparse.h"
+#include "flang/Support/Fortran.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
 #include <type_traits>
