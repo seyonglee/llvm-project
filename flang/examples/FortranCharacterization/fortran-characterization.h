@@ -61,7 +61,13 @@ public:
 
   void checkAllFeatures();
 
-  // feature stuff
+  // Fortran95's New Features
+
+  // R1055 forall-stmt -> FORALL concurrent-header forall-assignment-stmt
+  void Post(const parser::ForallStmt &);
+  // R1050 forall-construct ->
+  //         forall-construct-stmt [forall-body-construct]... end-forall-stmt
+  void Post(const parser::ForallConstruct &);
   void Post(const parser::Pass &);
   void Post(const parser::DoConstruct &node);
   void Post(const parser::FinalProcedureStmt &);
