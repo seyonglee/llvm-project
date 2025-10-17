@@ -199,4 +199,4 @@ class FeatureListAction : public PluginParseTreeAction {
 };
 
 static Fortran::frontend::FrontendPluginRegistry::Add<FeatureListAction> X(
-    "anthony-feature-list", "List program features");
+    "fortran-feature-list", "List program features");

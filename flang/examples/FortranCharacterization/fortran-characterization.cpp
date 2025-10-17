@@ -110,39 +110,15 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     /* Add other Fortran 2018 Features */
 };
 
+/* Fortran 95's New Features */
 void FeatureCharacterization::Post(const parser::ForallStmt &) {
   features["Forall statements"] = true;
 }
-
 void FeatureCharacterization::Post(const parser::ForallConstruct &) {
   features["Forall constructs"] = true;
 }
 
-void FeatureCharacterization::Post(const parser::Pass &) {
-  features["The PASS attribute"] = true;
-}
-void FeatureCharacterization::Post(const parser::DoConstruct &node) {
-  features["do concurrent"] = node.IsDoConcurrent();
-}
-void FeatureCharacterization::Post(const parser::FinalProcedureStmt &node) {
-  features["Finalization"] = true;
-}
-
-void FeatureCharacterization::Post(const parser::AssociateConstruct &) {
-  features["ASSOCIATE construct"] = true;
-}
-
-void FeatureCharacterization::Post(const parser::SelectTypeConstruct &) {
-  features["SELECT TYPE construct"] = true;
-}
-
-void FeatureCharacterization::Post(const parser::TypeParamDefStmt &) {
-  features["Parameterized derived types"] = true;
-}
-void FeatureCharacterization::Post(const parser::TypeParamSpec &) {
-  features["Parameterized derived types"] = true;
-}
-
+/* Fortran 2003's New Features */
 void FeatureCharacterization::Post(
     const parser::ProcedureDeclarationStmt &pds) {
   const auto &procAttrSpec{std::get<std::list<parser::ProcAttrSpec>>(pds.t)};
@@ -153,19 +129,18 @@ void FeatureCharacterization::Post(
     break;
   }
 }
-
-void FeatureCharacterization::Post(const parser::TypeAttrSpec &tas) {
-  if (std::get_if<parser::TypeAttrSpec::Extends>(&tas.u))
-    features["Type extension"] = true;
-  else if (std::get_if<parser::Abstract>(&tas.u))
-    features["Deferred bindings and abstract types"] = true;
+void FeatureCharacterization::Post(const parser::TypeParamDefStmt &) {
+  features["Parameterized derived types"] = true;
 }
-
-void FeatureCharacterization::Post(const parser::BindAttr &ba) {
-  if (std::get_if<parser::BindAttr::Deferred>(&ba.u))
-    features["Deferred bindings and abstract types"] = true;
+void FeatureCharacterization::Post(const parser::TypeParamSpec &) {
+  features["Parameterized derived types"] = true;
 }
-
+void FeatureCharacterization::Post(const parser::FinalProcedureStmt &node) {
+  features["Finalization"] = true;
+}
+void FeatureCharacterization::Post(const parser::Pass &) {
+  features["The PASS attribute"] = true;
+}
 void FeatureCharacterization::Post(const parser::TypeBoundGenericStmt &tbgs) {
   const auto &genericSpec{std::get<Indirection<GenericSpec>>(tbgs.t)};
   if (std::get_if<parser::DefinedOperator>(&genericSpec.value().u)) {
@@ -173,11 +148,18 @@ void FeatureCharacterization::Post(const parser::TypeBoundGenericStmt &tbgs) {
   } else if (std::get_if<GenericSpec::Assignment>(&genericSpec.value().u))
     features["Procedures bound to a type as operators"] = true;
 }
-
+void FeatureCharacterization::Post(const parser::TypeAttrSpec &tas) {
+  if (std::get_if<parser::TypeAttrSpec::Extends>(&tas.u))
+    features["Type extension"] = true;
+  else if (std::get_if<parser::Abstract>(&tas.u))
+    features["Deferred bindings and abstract types"] = true;
+}
 void FeatureCharacterization::Post(const parser::EnumDef &ed) {
   features["Enumerations"] = true;
 }
-
+void FeatureCharacterization::Post(const parser::AssociateConstruct &) {
+  features["ASSOCIATE construct"] = true;
+}
 void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
   if (const auto *dtsClass{
           std::get_if<parser::DeclarationTypeSpec::Class>(&dts.u)})
@@ -186,7 +168,13 @@ void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
                std::get_if<parser::DeclarationTypeSpec::ClassStar>(&dts.u)})
     features["Polymorphic entities"] = true;
 }
-
+void FeatureCharacterization::Post(const parser::SelectTypeConstruct &) {
+  features["SELECT TYPE construct"] = true;
+}
+void FeatureCharacterization::Post(const parser::BindAttr &ba) {
+  if (std::get_if<parser::BindAttr::Deferred>(&ba.u))
+    features["Deferred bindings and abstract types"] = true;
+}
 void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   const auto &dts{std::get<parser::DeclarationTypeSpec>(tds.t)};
   const auto &attrSpecList{std::get<std::list<parser::AttrSpec>>(tds.t)};
@@ -220,7 +208,6 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
     }
   }
 }
-
 void FeatureCharacterization::Post(const parser::AllocateStmt &allocateStmt) {
   /*if (auto info{CheckAllocateOptions(allocateStmt, context_)}) {
     for (const parser::Allocation &allocation :
@@ -236,11 +223,6 @@ void FeatureCharacterization::Post(const parser::AllocateStmt &allocateStmt) {
       features["The allocate statement (allocate with SOURCE)"] = true;
   }*/
 }
-
-void FeatureCharacterization::Post(const parser::ImportStmt &is) {
-  features["The IMPORT statement"] = true;
-}
-
 void FeatureCharacterization::Post(
     const parser::AllocatableStmt &allocatableStmt) {
   for (const parser::ObjectDecl &od : allocatableStmt.v) {
@@ -260,7 +242,6 @@ void FeatureCharacterization::Post(
     }
   }
 }
-
 void FeatureCharacterization::Post(const parser::UseStmt &us) {
   if (const auto &renameList{std::get_if<std::list<Rename>>(&us.u)})
     if (renameList->begin() != renameList->end())
@@ -272,14 +253,15 @@ void FeatureCharacterization::Post(const parser::UseStmt &us) {
     }
   }
 }
-
 void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
   const auto &bounds{std::get<PointerAssignmentStmt::Bounds>(pas.t)};
   if (const auto &brList{std::get_if<std::list<BoundsRemapping>>(&bounds.u)})
     if (!brList->empty())
       features["Pointer assignment (rank remapping)"] = true;
 }
-
+void FeatureCharacterization::Post(const parser::ImportStmt &is) {
+  features["The IMPORT statement"] = true;
+}
 void FeatureCharacterization::Post(const parser::Call &c) {
   const auto &pd{std::get<ProcedureDesignator>(c.t)};
   if (const auto &name{std::get_if<Name>(&pd.u)}) {
@@ -293,7 +275,6 @@ void FeatureCharacterization::Post(const parser::Call &c) {
     }
   }
 }
-
 void FeatureCharacterization::Post(const parser::IoControlSpec &iocs) {
   if (const auto &format{std::get_if<Format>(&iocs.u)}) {
     if (const auto &expr{std::get_if<Expr>(&format->u)}) {
@@ -310,7 +291,6 @@ void FeatureCharacterization::Post(const parser::IoControlSpec &iocs) {
     }
   }
 }
-
 void FeatureCharacterization::Post(const parser::TypeBoundProcBinding &tbpb) {
   if (const auto &tbgs{std::get_if<TypeBoundGenericStmt>(&tbpb.u)}) {
     const auto &genericSpec{std::get<Indirection<GenericSpec>>(tbgs->t)};
@@ -331,7 +311,6 @@ void FeatureCharacterization::Post(const parser::TypeBoundProcBinding &tbpb) {
       features["Derived type I/O"] = true;
   }
 }
-
 void FeatureCharacterization::Post(const parser::InterfaceStmt &is) {
   if (const auto &genericSpec{
           std::get_if<std::optional<parser::GenericSpec>>(&is.u)}) {
@@ -347,7 +326,6 @@ void FeatureCharacterization::Post(const parser::InterfaceStmt &is) {
       features["Derived type I/O"] = true;
   }
 }
-
 void FeatureCharacterization::Post(const parser::Name &name) {
   auto n{name.ToString()};
   std::transform(n.begin(), n.end(), n.begin(),
@@ -360,14 +338,19 @@ void FeatureCharacterization::Post(const parser::Name &name) {
       features["Interoperability with C pointers"] = true;
   }
 }
-
 void FeatureCharacterization::Post(const parser::TypeAttrSpec::BindC &) {
   features["Interoperability of derived types"] = true;
 }
-
 void FeatureCharacterization::Post(const parser::LanguageBindingSpec &) {
   features["Interoperability of derived types"] = true;
 }
+
+/* Fortran 2008's New Features */
+void FeatureCharacterization::Post(const parser::DoConstruct &node) {
+  features["do concurrent"] = node.IsDoConcurrent();
+}
+
+/* Fortran 2018's New Features */
 
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
@@ -388,35 +371,143 @@ void FeatureCharacterization::setMap(const char *key, bool val) {
 }
 
 void FeatureCharacterization::checkAllFeatures() {
-  out_ << "{\n";
+  out_ << "Fortran 95's New Features {\n";
+  checkMap("Forall statements");
+  checkMap("Forall constructs");
+  //checkMap("Enhancements to WHERE");
+  //checkMap("Initialization of pointers with NULL function");
+  //checkMap("Pure procedures");
+  //checkMap("Elemental procedures");
+  //checkMap("Automatic deallocation of allocatable arrays");
+  //checkMap("New and enhanced intrinsic procedures");
+  out_ << "}\n";
 
-  checkMap("The PASS attribute");
-  checkMap("do concurrent");
-  checkMap("Finalization");
-  checkMap("ASSOCIATE construct");
-  checkMap("SELECT TYPE construct");
-  checkMap("Parameterized derived types");
+  out_ << "Fortran 2003's New Features {\n";
   checkMap("Procedure pointers");
-  checkMap("Type extension");
-  checkMap("Deferred bindings and abstract types");
+  checkMap("Parameterized derived types");
+  checkMap("Finalization");
+  // checkMap("Procedures bound by name to a type (type-bound procedures)");
+  checkMap("The PASS attribute");
   checkMap("Procedures bound to a type as operators");
+  checkMap("Type extension");
+  // discuss why we need semantics here and why we won't be including it anymore
+  //checkMap("Overriding a type-bound procedure");
   checkMap("Enumerations");
+  checkMap("ASSOCIATE construct");
   checkMap("Polymorphic entities");
-  // checkMap("Allocatable scalars"); semantics
-  // checkMap("Allocatable character length"); semantics
-  // checkMap("The allocate statement (allocate with SOURCE)"); We could do this
-  // one
-  checkMap("The IMPORT statement");
+  checkMap("SELECT TYPE construct");
+  checkMap("Deferred bindings and abstract types");
+  checkMap("Structure constructors");
+  // checkMap("The allocate statement (allocate with SOURCE)"); //We could do
+  // this 
+  // checkMap("Allocatable scalars"); //Semantics 
+  // checkMap("Allocatable character length"); //Semantics
+  // checkMap("Allocating a polymorphic variable (e.g. using MOLD= or SOURCE=)");
+  // checkMap("Assignment to an allocatable array");
+  // checkMap("Transferring an allocation");
+  // checkMap("More control of access from a module");
   checkMap("Renaming operators on the USE statement");
   checkMap("Pointer assignment (rank remapping)");
+  // checkMap("Pointer INTENT");
+  // checkMap("VOLATILE attribute");
+  checkMap("The IMPORT statement");
+  // checkMap("Intrinsic module");
   checkMap("Access to the computing environment (Command line processing)");
+  // checkMap("Support for international character sets");
+  // checkMap("Binary, octal and hex constants");
+  // checkMap("Lengths of names and statements")
+  // checkMap("Array constructor syntax");
+  // checkMap("Specification and initialization expressions");
+  // checkMap("Complex constants");
+  // checkMap("Changes to intrinsic functions");
+  // checkMap("Controlling IEEE underflow");
+  // checkMap("Another IEEE class value");
   checkMap("Derived type I/O");
-  checkMap("Interoperability with C pointers", false);
-  // discuss why we need semantics here and why we won't be including it anymore
-  /* checkMap("Overriding a type-bound procedure");
-  //checkMap(
-  //    "Procedures bound by a name to a type (type-bound procedures)",
-  false);*/
+  // checkMap("Asynchronous I/O");
+  // checkMap("FLUSH statement");
+  // checkMap("IOMSG= spcifier");
+  // checkMap("Stream access I/O");
+  // checkMap("ROUND= spcifier");
+  // checkMap("DECIMAL= spcifier");
+  // checkMap("SIGN= spcifier");
+  // checkMap("Kind type parameters of integer specifiers");
+  // checkMap("Recursive I/O");
+  // checkMap("Intrinsic function for newline character");
+  // checkMap("I/O of IEEE exceptional values");
+  // checkMap("Comma after a P edit descriptor");
+  // checkMap("Interoperability of intrinsic types");
+  checkMap("Interoperability with C pointers");
+  checkMap("Interoperability of derived types");
+  // checkMap("Interoperability of variables");
+  // checkMap("Interoperability of procedures");
+  // checkMap("Interoperability of global data");
+  out_ << "}\n";
 
+  out_ << "Fortran 2008's New Features {\n";
+  // checkMap("Submodules");
+  // checkMap("Coarrays");
+  checkMap("do concurrent");
+  // checkMap("Contiguous attribute");
+  // checkMap("Simply contiguous arrays rank remapping to rank>1 target");
+  // checkMap("Maximum rank");
+  // checkMap("Long integers");
+  // checkMap("Allocatable components of recursive type");
+  // checkMap("Implied-shape array");
+  // checkMap("Pointer initialization with SAVE attribute");
+  // checkMap("Kind of a forall index");
+  // checkMap("Type statement for intrinsic types");
+  // checkMap("Declaring type-bound procedures");
+  // checkMap("Extensions to value attribute");
+  // checkMap("Omitting an allocatable component in a structure constructor");
+  // checkMap("Multiple allocations with source=");
+  // checkMap("Copying the properties of an object in an ALLOCATE statement");
+  // checkMap("Copying bounds of source array in ALLOCATE");
+  // checkMap("Polymorphic assignment");
+  // checkMap("Accessing real and imaginary parts");
+  // checkMap("Pointer functions");
+  // checkMap("Elemental dummy argument restrictions lifted");
+  // checkMap("Finding a unit when opening a file (newunit=u)");
+  // checkMap("g0 edit descriptor");
+  // checkMap("Unlimited format item");
+  // checkMap("Recursive I/O for an external unit");
+  // checkMap("The BLOCK construct");
+  // checkMap("Exit statement allowed in almost any construct");
+  // checkMap("STOP code");
+  // checkMap("Bit sequence comparison");
+  // checkMap("Combined shifting");
+  // checkMap("Counting bits");
+  // checkMap("Masking bits");
+  // checkMap("Shifting bits");
+  // checkMap("Merging bits");
+  // checkMap("Bit transformational functions");
+  // checkMap("Storage size");
+  // checkMap("Optional argument radix added to selected real kind");
+  // checkMap("Extensions to trigonometric and hyperbolic intrinsic functions");
+  // checkMap("Bessel functions");
+  // checkMap("Error and gamma functions");
+  // checkMap("Euclidean vector norms");
+  // checkMap("Parity");
+  // checkMap("Execute command line");
+  // checkMap("Optional back argument added to maxloc and minloc");
+  // checkMap("Find location in an array");
+  // checkMap("String comparison");
+  // checkMap("Constants in ISO_FORTRAN_ENV");
+  // checkMap("Compiler information in ISO_FORTRAN_ENV");
+  // checkMap("Function for C sizeof");
+  // checkMap("Optional argument for ieee_selected_real_kind");
+  // checkMap("Save attribute for module and submodule data");
+  // checkMap("Empty contains part");
+  // checkMap("Form of the end statement for an internal or module procedure");
+  // checkMap("Internal procedure as an actual argument");
+  // checkMap(
+  //    "Null pointer or unallocated allocatable as an absent dummy argument");
+  // checkMap("Non-pointer actual for pointer dummy argument");
+  // checkMap("Impure elemental procedures");
+  // checkMap("Generic resolution by procedureness");
+  // checkMap("Generic resolution by pointer vs. allocatable");
+  out_ << "}\n";
+
+  out_ << "Fortran 2018's New Features {\n";
+  // checkMap("C descriptors");
   out_ << "}\n";
 }
