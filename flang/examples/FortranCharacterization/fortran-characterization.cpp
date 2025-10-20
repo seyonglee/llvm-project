@@ -110,22 +110,48 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     /* Add other Fortran 2018 Features */
 };
 
-/* Fortran 95's New Features */
+///////////////////////////////
+// Fortran 95's New Features //
+///////////////////////////////
+// R1055 forall-stmt -> FORALL concurrent-header forall-assignment-stmt
 void FeatureCharacterization::Post(const parser::ForallStmt &) {
   features["Forall statements"] = true;
 }
+// R1050 forall-construct ->
+//         forall-construct-stmt [forall-body-construct]... end-forall-stmt
 void FeatureCharacterization::Post(const parser::ForallConstruct &) {
   features["Forall constructs"] = true;
 }
+// R1527 prefix-spec ->
+//         declaration-type-spec | ELEMENTAL | IMPURE | MODULE |
+//         NON_RECURSIVE | PURE | RECURSIVE |
+// (CUDA)  ATTRIBUTES ( (DEVICE | GLOBAL | GRID_GLOBAL | HOST)... )
+//         LAUNCH_BOUNDS(expr-list) | CLUSTER_DIMS(expr-list)
+void FeatureCharacterization::Post(const parser::PrefixSpec &pSpec) {
+  if (std::get_if<parser::PrefixSpec::Pure>(&pSpec.u)) {
+    features["Pure procedures"] = true;
+  } else if (std::get_if<parser::PrefixSpec::Elemental>(&pSpec.u)) {
+    features["Elemental procedures"] = true;
+  }
+}
 
-/* Fortran 2003's New Features */
+/////////////////////////////////
+// Fortran 2003's New Features //
+/////////////////////////////////
+std::vector<std::string>
+    FeatureCharacterization::Fortran2003_interop_c_procedures{"c_ptr",
+        "c_funptr", "c_null_funptr", "c_loc", "c_funloc", "c_associated",
+        "c_f_pointer", "c_f_procpointer"};
+// R1512 procedure-declaration-stmt ->
+//         PROCEDURE ( [proc-interface] ) [[, proc-attr-spec]... ::]
+//         proc-decl-list
 void FeatureCharacterization::Post(
     const parser::ProcedureDeclarationStmt &pds) {
   const auto &procAttrSpec{std::get<std::list<parser::ProcAttrSpec>>(pds.t)};
   for (const parser::ProcAttrSpec &procAttr : procAttrSpec) {
-    // if (std::get_if<parser::Pointer>(&procAttr.u))
-    if (std::get_if<parser::Pointer>(&procAttr.u))
+    if (std::get_if<parser::Pointer>(&procAttr.u)) {
       features["Procedure pointers"] = true;
+    }
     break;
   }
 }
@@ -145,14 +171,16 @@ void FeatureCharacterization::Post(const parser::TypeBoundGenericStmt &tbgs) {
   const auto &genericSpec{std::get<Indirection<GenericSpec>>(tbgs.t)};
   if (std::get_if<parser::DefinedOperator>(&genericSpec.value().u)) {
     features["Procedures bound to a type as operators"] = true;
-  } else if (std::get_if<GenericSpec::Assignment>(&genericSpec.value().u))
+  } else if (std::get_if<GenericSpec::Assignment>(&genericSpec.value().u)) {
     features["Procedures bound to a type as operators"] = true;
+  }
 }
 void FeatureCharacterization::Post(const parser::TypeAttrSpec &tas) {
-  if (std::get_if<parser::TypeAttrSpec::Extends>(&tas.u))
+  if (std::get_if<parser::TypeAttrSpec::Extends>(&tas.u)) {
     features["Type extension"] = true;
-  else if (std::get_if<parser::Abstract>(&tas.u))
+  } else if (std::get_if<parser::Abstract>(&tas.u)) {
     features["Deferred bindings and abstract types"] = true;
+  }
 }
 void FeatureCharacterization::Post(const parser::EnumDef &ed) {
   features["Enumerations"] = true;
@@ -162,18 +190,22 @@ void FeatureCharacterization::Post(const parser::AssociateConstruct &) {
 }
 void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
   if (const auto *dtsClass{
-          std::get_if<parser::DeclarationTypeSpec::Class>(&dts.u)})
+          std::get_if<parser::DeclarationTypeSpec::Class>(&dts.u)}) {
     features["Polymorphic entities"] = true;
-  else if (const auto *dtsClass{
-               std::get_if<parser::DeclarationTypeSpec::ClassStar>(&dts.u)})
+  } else if (const auto *dtsClass{
+                 std::get_if<parser::DeclarationTypeSpec::ClassStar>(&dts.u)}) {
     features["Polymorphic entities"] = true;
+  }
 }
+// R1153 select-type-construct ->
+//           select-type stmt [type-guard-stmt block]...end-select-type-stmt
 void FeatureCharacterization::Post(const parser::SelectTypeConstruct &) {
   features["SELECT TYPE construct"] = true;
 }
 void FeatureCharacterization::Post(const parser::BindAttr &ba) {
-  if (std::get_if<parser::BindAttr::Deferred>(&ba.u))
+  if (std::get_if<parser::BindAttr::Deferred>(&ba.u)) {
     features["Deferred bindings and abstract types"] = true;
+  }
 }
 void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   const auto &dts{std::get<parser::DeclarationTypeSpec>(tds.t)};
@@ -188,14 +220,16 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
       break;
     }
   }
-  if (!allocatableSpec)
+  if (!allocatableSpec) {
     return;
+  }
 
   // if there is an arrayspec, it's not a scalar
   for (const parser::EntityDecl &ed : entityDeclList) {
     // const auto &arrSpec{std::get<parser::ArraySpec>(ed)};
-    if (std::get<std::optional<parser::ArraySpec>>(ed.t).has_value())
+    if (std::get<std::optional<parser::ArraySpec>>(ed.t).has_value()) {
       return;
+    }
   }
 
   // check DeclarationTypeSpec to see if it's character type. we don't care
@@ -233,9 +267,9 @@ void FeatureCharacterization::Post(
       if (ultimate_->Rank() == 0) {
         out_ << name.ToString() << "\n";
         if (ultimate_->GetType()->category() ==
-            DeclTypeSpec::Category::Character)
+            DeclTypeSpec::Category::Character) {
           features["Allocatable character length"] = true;
-        else {
+        } else {
           features["Allocatable scalars"] = true;
         }
       }
@@ -243,21 +277,26 @@ void FeatureCharacterization::Post(
   }
 }
 void FeatureCharacterization::Post(const parser::UseStmt &us) {
-  if (const auto &renameList{std::get_if<std::list<Rename>>(&us.u)})
-    if (renameList->begin() != renameList->end())
+  if (const auto &renameList{std::get_if<std::list<Rename>>(&us.u)}) {
+    if (renameList->begin() != renameList->end()) {
       features["Renaming operators on the USE statement"] = true;
+    }
+  }
   if (const auto &onlyList{std::get_if<std::list<Only>>(&us.u)}) {
     for (const Only &o : *onlyList) {
-      if (std::holds_alternative<Rename>(o.u))
+      if (std::holds_alternative<Rename>(o.u)) {
         features["Renaming operators on the USE statement"] = true;
+      }
     }
   }
 }
 void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
   const auto &bounds{std::get<PointerAssignmentStmt::Bounds>(pas.t)};
-  if (const auto &brList{std::get_if<std::list<BoundsRemapping>>(&bounds.u)})
-    if (!brList->empty())
+  if (const auto &brList{std::get_if<std::list<BoundsRemapping>>(&bounds.u)}) {
+    if (!brList->empty()) {
       features["Pointer assignment (rank remapping)"] = true;
+    }
+  }
 }
 void FeatureCharacterization::Post(const parser::ImportStmt &is) {
   features["The IMPORT statement"] = true;
@@ -284,8 +323,9 @@ void FeatureCharacterization::Post(const parser::IoControlSpec &iocs) {
           if (fmtString.find("DT") != std::string::npos ||
               fmtString.find("dt") != std::string::npos ||
               fmtString.find("dT") != std::string::npos ||
-              fmtString.find("Dt") != std::string::npos)
+              fmtString.find("Dt") != std::string::npos) {
             features["Derived type I/O"] = true;
+          }
         }
       }
     }
@@ -307,8 +347,9 @@ void FeatureCharacterization::Post(const parser::TypeBoundProcBinding &tbpb) {
         std::get_if<parser::GenericSpec::WriteFormatted>(
             &genericSpec.value().u) ||
         std::get_if<parser::GenericSpec::WriteUnformatted>(
-            &genericSpec.value().u))
+            &genericSpec.value().u)) {
       features["Derived type I/O"] = true;
+    }
   }
 }
 void FeatureCharacterization::Post(const parser::InterfaceStmt &is) {
@@ -322,20 +363,19 @@ void FeatureCharacterization::Post(const parser::InterfaceStmt &is) {
             std::get_if<parser::GenericSpec::WriteFormatted>(
                 &genericSpec->value().u) ||
             std::get_if<parser::GenericSpec::WriteUnformatted>(
-                &genericSpec->value().u)))
+                &genericSpec->value().u))) {
       features["Derived type I/O"] = true;
+    }
   }
 }
 void FeatureCharacterization::Post(const parser::Name &name) {
   auto n{name.ToString()};
   std::transform(n.begin(), n.end(), n.begin(),
       [](unsigned char c) { return std::tolower(c); });
-  std::vector<std::string> possibilities{"c_ptr", "c_funptr", "c_null_funptr",
-      "c_loc", "c_funloc", "c_associated", "c_f_pointer", "c_f_procpointer"};
-  // if (n == "c_ptr" || "c_funptr" || "c_null_ptr")
-  for (const auto &p : possibilities) {
-    if (n == p)
+  for (const auto &p : Fortran2003_interop_c_procedures) {
+    if (n == p) {
       features["Interoperability with C pointers"] = true;
+    }
   }
 }
 void FeatureCharacterization::Post(const parser::TypeAttrSpec::BindC &) {
@@ -355,31 +395,34 @@ void FeatureCharacterization::Post(const parser::DoConstruct &node) {
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
   out_ << "\t\"" << key << "\": ";
-  if (itr != features.end() && itr->second)
+  if (itr != features.end() && itr->second) {
     out_ << "true";
-  else
+  } else {
     out_ << "false";
+  }
 
-  if (addComma)
+  if (addComma) {
     out_ << ",";
+  }
   out_ << "\n";
 }
 void FeatureCharacterization::setMap(const char *key, bool val) {
   auto itr = features.find(key);
-  if (itr != features.end())
+  if (itr != features.end()) {
     features[key] = val;
+  }
 }
 
 void FeatureCharacterization::checkAllFeatures() {
   out_ << "Fortran 95's New Features {\n";
   checkMap("Forall statements");
   checkMap("Forall constructs");
-  //checkMap("Enhancements to WHERE");
-  //checkMap("Initialization of pointers with NULL function");
-  //checkMap("Pure procedures");
-  //checkMap("Elemental procedures");
-  //checkMap("Automatic deallocation of allocatable arrays");
-  //checkMap("New and enhanced intrinsic procedures");
+  // checkMap("Enhancements to WHERE");
+  // checkMap("Initialization of pointers with NULL function");
+  checkMap("Pure procedures");
+  checkMap("Elemental procedures");
+  // checkMap("Automatic deallocation of allocatable arrays");
+  // checkMap("New and enhanced intrinsic procedures");
   out_ << "}\n";
 
   out_ << "Fortran 2003's New Features {\n";
@@ -391,7 +434,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Procedures bound to a type as operators");
   checkMap("Type extension");
   // discuss why we need semantics here and why we won't be including it anymore
-  //checkMap("Overriding a type-bound procedure");
+  // checkMap("Overriding a type-bound procedure");
   checkMap("Enumerations");
   checkMap("ASSOCIATE construct");
   checkMap("Polymorphic entities");
@@ -399,11 +442,11 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Deferred bindings and abstract types");
   checkMap("Structure constructors");
   // checkMap("The allocate statement (allocate with SOURCE)"); //We could do
-  // this 
-  // checkMap("Allocatable scalars"); //Semantics 
+  // this
+  // checkMap("Allocatable scalars"); //Semantics
   // checkMap("Allocatable character length"); //Semantics
-  // checkMap("Allocating a polymorphic variable (e.g. using MOLD= or SOURCE=)");
-  // checkMap("Assignment to an allocatable array");
+  // checkMap("Allocating a polymorphic variable (e.g. using MOLD= or
+  // SOURCE=)"); checkMap("Assignment to an allocatable array");
   // checkMap("Transferring an allocation");
   // checkMap("More control of access from a module");
   checkMap("Renaming operators on the USE statement");

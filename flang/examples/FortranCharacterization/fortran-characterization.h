@@ -61,47 +61,53 @@ public:
 
   void checkAllFeatures();
 
-  // Fortran95's New Features
-
-  // R1055 forall-stmt -> FORALL concurrent-header forall-assignment-stmt
+  ///////////////////////////////
+  // Fortran 95's New Features //
+  ///////////////////////////////
+  // - Forall statements
   void Post(const parser::ForallStmt &);
-  // R1050 forall-construct ->
-  //         forall-construct-stmt [forall-body-construct]... end-forall-stmt
+  // - Forall constructs
   void Post(const parser::ForallConstruct &);
-  void Post(const parser::Pass &);
-  void Post(const parser::DoConstruct &node);
-  void Post(const parser::FinalProcedureStmt &);
-  void Post(const parser::AssociateConstruct &);
-  // R1153 select-type-construct ->
-  //           select-type stmt [type-guard-stmt block]...end-select-type-stmt
-  void Post(const parser::SelectTypeConstruct &);
+  // - Pure procedures
+  // - Elemental procedures
+  void Post(const parser::PrefixSpec &);
+
+  /////////////////////////////////
+  // Fortran 2003's New Features //
+  /////////////////////////////////
+  static std::vector<std::string> Fortran2003_interop_c_procedures;
+  // - procedure pointers
+  void Post(const parser::ProcedureDeclarationStmt &);
   // - parameterized derived types
   void Post(const parser::TypeParamDefStmt &);
   void Post(const parser::TypeParamSpec &);
-  // - procedure pointers
-  void Post(const parser::ProcedureDeclarationStmt &);
-  // - type extension and abstract types
-  void Post(const parser::TypeAttrSpec &);
-  // - deferred bindings
-  void Post(const parser::BindAttr &);
+  void Post(const parser::FinalProcedureStmt &);
+  void Post(const parser::Pass &);
   // - procedures bound to a type as operators
   void Post(const parser::TypeBoundGenericStmt &);
+  // - type extension and abstract types
+  void Post(const parser::TypeAttrSpec &);
   // - Enumerations
   void Post(const parser::EnumDef &);
+  void Post(const parser::AssociateConstruct &);
   // - Polymorphic Entities
   void Post(const parser::DeclarationTypeSpec &);
+  // - SELECT TYPE construct
+  void Post(const parser::SelectTypeConstruct &);
+  // - deferred bindings
+  void Post(const parser::BindAttr &);
   // - Allocatable scalar and
   // - allocate and initialize with source keyword
   void Post(const parser::TypeDeclarationStmt &);
   void Post(const parser::AllocateStmt &allocateStmt);
   /////// account for Allocatable stmt hopefully
   void Post(const parser::AllocatableStmt &allocatableStmt);
-  // - import statement
-  void Post(const parser::ImportStmt &is);
   // - Renaming operators on the USE staement
   void Post(const parser::UseStmt &us);
   // - Pointer assignment (rank remapping)
   void Post(const parser::PointerAssignmentStmt &us);
+  // - import statement
+  void Post(const parser::ImportStmt &is);
   // - Access to the computing environment
   //   (Command line processing)
   void Post(const parser::Call &cs);
@@ -114,6 +120,7 @@ public:
   // - Interoperability of derived types
   void Post(const parser::TypeAttrSpec::BindC &);
   void Post(const parser::LanguageBindingSpec &);
+  void Post(const parser::DoConstruct &node);
 
 protected:
 private:
