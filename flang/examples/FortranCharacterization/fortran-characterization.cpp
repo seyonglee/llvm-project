@@ -15,6 +15,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Forall statements", false}, {"Forall constructs", false},
     {"Enhancements to WHERE", false},
     {"Initialization of pointers with NULL function", false},
+    {"Default initialization of derived types", false},
     {"Pure procedures", false}, {"Elemental procedures", false},
     {"Automatic deallocation of allocatable arrays", false},
     {"New and enhanced intrinsic procedures", false},
@@ -127,6 +128,16 @@ void FeatureCharacterization::Post(const parser::ForallStmt &) {
 //         forall-construct-stmt [forall-body-construct]... end-forall-stmt
 void FeatureCharacterization::Post(const parser::ForallConstruct &) {
   features["Forall constructs"] = true;
+}
+// R739 component-decl ->
+//       component-name [( component-array-spec )]
+//       [lbracket coarray-spec rbracket] [* char-length]
+//       [component-initialization]
+void FeatureCharacterization::Post(const parser::ComponentDecl &compDecl) {
+  const auto &compInit{std::get<std::optional<Initialization>>(compDecl.t)};
+  if (compInit.has_value()) {
+    features["Default initialization of derived types"] = true;
+  }
 }
 // R1527 prefix-spec ->
 //         declaration-type-spec | ELEMENTAL | IMPURE | MODULE |
@@ -438,6 +449,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Forall constructs");
   // checkMap("Enhancements to WHERE");
   // checkMap("Initialization of pointers with NULL function");
+  checkMap("Default initialization of derived types");
   checkMap("Pure procedures");
   checkMap("Elemental procedures");
   // checkMap("Automatic deallocation of allocatable arrays");

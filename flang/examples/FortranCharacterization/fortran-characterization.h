@@ -71,6 +71,8 @@ public:
   // - Pure procedures
   // - Elemental procedures
   void Post(const parser::PrefixSpec &);
+  // - Default initialization of derived types
+  void Post(const parser::ComponentDecl &);
   // - New and enhanced intrinsic procedures
   //   TODO: handle SIGN() function.
   // void Post(const parser::Call &cs);
