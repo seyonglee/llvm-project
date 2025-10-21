@@ -129,6 +129,10 @@ void FeatureCharacterization::Post(const parser::ForallStmt &) {
 void FeatureCharacterization::Post(const parser::ForallConstruct &) {
   features["Forall constructs"] = true;
 }
+// R806 null-init -> function-reference     {constrained to be NULL()}
+void FeatureCharacterization::Post(const parser::NullInit &nI) {
+  features["Initialization of pointers with NULL function"] = true;
+}
 // R739 component-decl ->
 //       component-name [( component-array-spec )]
 //       [lbracket coarray-spec rbracket] [* char-length]
@@ -331,7 +335,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       features
           ["Access to the computing environment (Command line processing)"] =
               true;
-    } else if (fnName == "null" || fnName == "cpu_time") {
+    } else if (fnName == "null") {
+      features["New and enhanced intrinsic procedures"] = true;
+      features["Initialization of pointers with NULL function"] = true;
+    } else if (fnName == "cpu_time") {
       features["New and enhanced intrinsic procedures"] = true;
     } else if (fnName == "ceiling" || fnName == "floor") {
       for (const auto &arg : actArgSpecs) {
@@ -448,7 +455,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Forall statements");
   checkMap("Forall constructs");
   // checkMap("Enhancements to WHERE");
-  // checkMap("Initialization of pointers with NULL function");
+  checkMap("Initialization of pointers with NULL function");
   checkMap("Default initialization of derived types");
   checkMap("Pure procedures");
   checkMap("Elemental procedures");

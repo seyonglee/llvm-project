@@ -68,11 +68,14 @@ public:
   void Post(const parser::ForallStmt &);
   // - Forall constructs
   void Post(const parser::ForallConstruct &);
+  // - Initialization of pointers with NULL function
+  void Post(const parser::NullInit &);
+  // - Default initialization of derived types
+  void Post(const parser::ComponentDecl &);
   // - Pure procedures
   // - Elemental procedures
   void Post(const parser::PrefixSpec &);
-  // - Default initialization of derived types
-  void Post(const parser::ComponentDecl &);
+  // - Initialization of pointers with NULL function
   // - New and enhanced intrinsic procedures
   //   TODO: handle SIGN() function.
   // void Post(const parser::Call &cs);
