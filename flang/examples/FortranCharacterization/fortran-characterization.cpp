@@ -4,6 +4,12 @@
 // attributes of interest
 #include "fortran-characterization.h"
 
+// Convert inputString to lowercases and store in a variable lName
+#define CONVERT2LOWERCASE(inputString, lName) \
+  auto lName{inputString}; \
+  std::transform(lName.begin(), lName.end(), lName.begin(), \
+      [](unsigned char c) { return std::tolower(c); })
+
 std::unordered_map<const char *, bool> FeatureCharacterization::features{
     /* Fortran 95's New Features */
     {"Forall statements", false}, {"Forall constructs", false},
@@ -301,16 +307,39 @@ void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
 void FeatureCharacterization::Post(const parser::ImportStmt &is) {
   features["The IMPORT statement"] = true;
 }
+// R1520 function-reference -> procedure-designator ( [actual-arg-spec-list] )
+// R1521 call-stmt -> CALL procedure-designator [( [actual-arg-spec-list] )]
 void FeatureCharacterization::Post(const parser::Call &c) {
+  const auto &actArgSpecs{std::get<std::list<ActualArgSpec>>(c.t)};
   const auto &pd{std::get<ProcedureDesignator>(c.t)};
   if (const auto &name{std::get_if<Name>(&pd.u)}) {
-    std::string fnName{name->ToString()};
+    CONVERT2LOWERCASE(name->ToString(), fnName);
     if (fnName == "get_command_argument" ||
         fnName == "command_argument_count" ||
         fnName == "get_environment_variable" || fnName == "get_command") {
       features
           ["Access to the computing environment (Command line processing)"] =
               true;
+    } else if (fnName == "null" || fnName == "cpu_time") {
+      features["New and enhanced intrinsic procedures"] = true;
+    } else if (fnName == "ceiling" || fnName == "floor") {
+      for (const auto &arg : actArgSpecs) {
+        const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+        if (optKeyword.has_value()) {
+          CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
+          if (kw == "kind") {
+            features["New and enhanced intrinsic procedures"] = true;
+            break;
+          }
+        }
+      }
+    } else {
+      for (const auto &p : Fortran2003_interop_c_procedures) {
+        if (fnName == p) {
+          features["Interoperability with C pointers"] = true;
+          break;
+        }
+      }
     }
   }
 }
@@ -368,16 +397,6 @@ void FeatureCharacterization::Post(const parser::InterfaceStmt &is) {
     }
   }
 }
-void FeatureCharacterization::Post(const parser::Name &name) {
-  auto n{name.ToString()};
-  std::transform(n.begin(), n.end(), n.begin(),
-      [](unsigned char c) { return std::tolower(c); });
-  for (const auto &p : Fortran2003_interop_c_procedures) {
-    if (n == p) {
-      features["Interoperability with C pointers"] = true;
-    }
-  }
-}
 void FeatureCharacterization::Post(const parser::TypeAttrSpec::BindC &) {
   features["Interoperability of derived types"] = true;
 }
@@ -422,7 +441,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Pure procedures");
   checkMap("Elemental procedures");
   // checkMap("Automatic deallocation of allocatable arrays");
-  // checkMap("New and enhanced intrinsic procedures");
+  checkMap("New and enhanced intrinsic procedures");
   out_ << "}\n";
 
   out_ << "Fortran 2003's New Features {\n";

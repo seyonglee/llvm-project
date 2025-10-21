@@ -71,6 +71,9 @@ public:
   // - Pure procedures
   // - Elemental procedures
   void Post(const parser::PrefixSpec &);
+  // - New and enhanced intrinsic procedures
+  //   TODO: handle SIGN() function.
+  // void Post(const parser::Call &cs);
 
   /////////////////////////////////
   // Fortran 2003's New Features //
@@ -110,13 +113,12 @@ public:
   void Post(const parser::ImportStmt &is);
   // - Access to the computing environment
   //   (Command line processing)
+  // - Interoperability of intrinsic types
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
   void Post(const parser::TypeBoundProcBinding &tbpb);
   void Post(const parser::InterfaceStmt &is);
-  // - Interoperability of intrinsic types
-  void Post(const parser::Name &name);
   // - Interoperability of derived types
   void Post(const parser::TypeAttrSpec::BindC &);
   void Post(const parser::LanguageBindingSpec &);
