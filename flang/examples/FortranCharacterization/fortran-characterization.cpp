@@ -129,6 +129,15 @@ void FeatureCharacterization::Post(const parser::ForallStmt &) {
 void FeatureCharacterization::Post(const parser::ForallConstruct &) {
   features["Forall constructs"] = true;
 }
+// R1044 where-body-construct ->
+//         where-assignment-stmt | where-stmt | where-construct
+void FeatureCharacterization::Post(const parser::WhereBodyConstruct &wB) {
+  if (std::get_if<Statement<WhereStmt>>(&wB.u)) {
+    features["Enhancements to WHERE"] = true;
+  } else if (std::get_if<common::Indirection<WhereConstruct>>(&wB.u)) {
+    features["Enhancements to WHERE"] = true;
+  }
+}
 // R806 null-init -> function-reference     {constrained to be NULL()}
 void FeatureCharacterization::Post(const parser::NullInit &nI) {
   features["Initialization of pointers with NULL function"] = true;
@@ -210,11 +219,9 @@ void FeatureCharacterization::Post(const parser::AssociateConstruct &) {
   features["ASSOCIATE construct"] = true;
 }
 void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
-  if (const auto *dtsClass{
-          std::get_if<parser::DeclarationTypeSpec::Class>(&dts.u)}) {
+  if (std::get_if<parser::DeclarationTypeSpec::Class>(&dts.u)) {
     features["Polymorphic entities"] = true;
-  } else if (const auto *dtsClass{
-                 std::get_if<parser::DeclarationTypeSpec::ClassStar>(&dts.u)}) {
+  } else if (std::get_if<parser::DeclarationTypeSpec::ClassStar>(&dts.u)) {
     features["Polymorphic entities"] = true;
   }
 }
@@ -454,7 +461,7 @@ void FeatureCharacterization::checkAllFeatures() {
   out_ << "Fortran 95's New Features {\n";
   checkMap("Forall statements");
   checkMap("Forall constructs");
-  // checkMap("Enhancements to WHERE");
+  checkMap("Enhancements to WHERE");
   checkMap("Initialization of pointers with NULL function");
   checkMap("Default initialization of derived types");
   checkMap("Pure procedures");

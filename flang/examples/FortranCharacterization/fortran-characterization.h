@@ -68,6 +68,8 @@ public:
   void Post(const parser::ForallStmt &);
   // - Forall constructs
   void Post(const parser::ForallConstruct &);
+  // - Enhancements to WHERE
+  void Post(const parser::WhereBodyConstruct &);
   // - Initialization of pointers with NULL function
   void Post(const parser::NullInit &);
   // - Default initialization of derived types
