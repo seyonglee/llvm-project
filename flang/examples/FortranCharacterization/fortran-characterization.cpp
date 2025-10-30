@@ -367,6 +367,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       }
     }
   }
+  if (std::get_if<ProcComponentRef>(&pd.u)) {
+    features["Procedures bound by name to a type (type-bound procedures)"] =
+        true;
+  }
 }
 void FeatureCharacterization::Post(const parser::IoControlSpec &iocs) {
   if (const auto &format{std::get_if<Format>(&iocs.u)}) {
@@ -385,7 +389,11 @@ void FeatureCharacterization::Post(const parser::IoControlSpec &iocs) {
     }
   }
 }
+// R748 type-bound-proc-binding ->
+//        type-bound-procedure-stmt | type-bound-generic-stmt |
+//        final-procedure-stmt
 void FeatureCharacterization::Post(const parser::TypeBoundProcBinding &tbpb) {
+  features["Procedures bound by name to a type (type-bound procedures)"] = true;
   if (const auto &tbgs{std::get_if<TypeBoundGenericStmt>(&tbpb.u)}) {
     const auto &genericSpec{std::get<Indirection<GenericSpec>>(tbgs->t)};
     // if (const auto *definedOp{
@@ -474,7 +482,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Procedure pointers");
   checkMap("Parameterized derived types");
   checkMap("Finalization");
-  // checkMap("Procedures bound by name to a type (type-bound procedures)");
+  checkMap("Procedures bound by name to a type (type-bound procedures)");
   checkMap("The PASS attribute");
   checkMap("Procedures bound to a type as operators");
   checkMap("Type extension");

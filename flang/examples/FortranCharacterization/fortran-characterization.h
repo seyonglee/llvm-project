@@ -92,6 +92,8 @@ public:
   void Post(const parser::TypeParamDefStmt &);
   void Post(const parser::TypeParamSpec &);
   void Post(const parser::FinalProcedureStmt &);
+  // - Procedures bound by name to a type (type-bound procedures)
+  // void Post(const parser::TypeBoundProcBinding &node);
   void Post(const parser::Pass &);
   // - procedures bound to a type as operators
   void Post(const parser::TypeBoundGenericStmt &);
