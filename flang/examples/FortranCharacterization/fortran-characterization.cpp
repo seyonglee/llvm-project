@@ -260,14 +260,15 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
     }
   }
 
-  // check DeclarationTypeSpec to see if it's character type. we don't care
-  // about that here.
   if (const auto &its{std::get_if<parser::IntrinsicTypeSpec>(&dts.u)}) {
     if (std::holds_alternative<parser::IntrinsicTypeSpec::Character>(its->u)) {
       features["Allocatable character length"] = true;
     } else {
       features["Allocatable scalars"] = true;
     }
+  } else {
+    // All non-array types are scalar type.
+    features["Allocatable scalars"] = true;
   }
 }
 void FeatureCharacterization::Post(const parser::AllocateStmt &allocateStmt) {
@@ -496,8 +497,8 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Structure constructors");
   // checkMap("The allocate statement (allocate with SOURCE)"); //We could do
   // this
-  // checkMap("Allocatable scalars"); //Semantics
-  // checkMap("Allocatable character length"); //Semantics
+  checkMap("Allocatable scalars"); // Semantics
+  checkMap("Allocatable character length"); // Semantics
   // checkMap("Allocating a polymorphic variable (e.g. using MOLD= or
   // SOURCE=)"); checkMap("Assignment to an allocatable array");
   // checkMap("Transferring an allocation");
