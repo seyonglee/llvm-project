@@ -61,6 +61,8 @@ public:
 
   void checkAllFeatures();
 
+  static std::vector<std::string> Fortran_intrinsic_modules;
+
   ///////////////////////////////
   // Fortran 95's New Features //
   ///////////////////////////////
@@ -115,6 +117,7 @@ public:
   /////// account for Allocatable stmt hopefully
   void Post(const parser::AllocatableStmt &allocatableStmt);
   // - Renaming operators on the USE staement
+  // - Intrinsic modules
   void Post(const parser::UseStmt &us);
   // - Pointer assignment (rank remapping)
   void Post(const parser::PointerAssignmentStmt &us);

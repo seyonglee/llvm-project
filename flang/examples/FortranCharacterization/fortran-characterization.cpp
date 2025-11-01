@@ -39,7 +39,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Renaming operators on the USE statement", false},
     {"Pointer assignment (rank remapping)", false}, {"Pointer INTENT", false},
     {"VOLATILE attribute", false}, {"The IMPORT statement", false},
-    {"Intrinsic module", false},
+    {"Intrinsic modules", false},
     {"Access to the computing environment (Command line processing)", false},
     {"Support for international character sets", false},
     {"Binary, octal and hex constants", false},
@@ -116,6 +116,11 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"C descriptors", false}
     /* Add other Fortran 2018 Features */
 };
+
+std::vector<std::string> FeatureCharacterization::Fortran_intrinsic_modules{
+    "iso_fortran_env", "ieee_arithmetic", "ieee_exceptions", "ieee_features",
+    "iso_c_binding", "iso_varying_string", "ieee_control_type",
+    "ieee_status_type"};
 
 ///////////////////////////////
 // Fortran 95's New Features //
@@ -305,7 +310,20 @@ void FeatureCharacterization::Post(
     }
   }
 }
+// R1409 use-stmt ->
+//         USE [[, module-nature] ::] module-name [, rename-list] |
+//         USE [[, module-nature] ::] module-name , ONLY : [only-list]
+// R1410 module-nature -> INTRINSIC | NON_INTRINSIC
 void FeatureCharacterization::Post(const parser::UseStmt &us) {
+  CONVERT2LOWERCASE(us.moduleName.ToString(), modString);
+  auto it = std::find(Fortran_intrinsic_modules.begin(),
+      Fortran_intrinsic_modules.end(), modString);
+  if (it != Fortran_intrinsic_modules.end()) {
+    if (us.nature.value_or(parser::UseStmt::ModuleNature::Non_Intrinsic) !=
+        parser::UseStmt::ModuleNature::Intrinsic) {
+      features["Intrinsic modules"] = true;
+    }
+  }
   if (const auto &renameList{std::get_if<std::list<Rename>>(&us.u)}) {
     if (renameList->begin() != renameList->end()) {
       features["Renaming operators on the USE statement"] = true;
@@ -508,7 +526,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Pointer INTENT");
   // checkMap("VOLATILE attribute");
   checkMap("The IMPORT statement");
-  // checkMap("Intrinsic module");
+  checkMap("Intrinsic modules");
   checkMap("Access to the computing environment (Command line processing)");
   // checkMap("Support for international character sets");
   // checkMap("Binary, octal and hex constants");
