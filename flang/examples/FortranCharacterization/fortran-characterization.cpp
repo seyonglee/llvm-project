@@ -291,6 +291,7 @@ void FeatureCharacterization::Post(const parser::AllocateStmt &allocateStmt) {
       features["The allocate statement (allocate with SOURCE)"] = true;
   }*/
 }
+// R829 allocatable-stmt -> ALLOCATABLE [::] allocatable-decl-list
 void FeatureCharacterization::Post(
     const parser::AllocatableStmt &allocatableStmt) {
   for (const parser::ObjectDecl &od : allocatableStmt.v) {
@@ -309,6 +310,13 @@ void FeatureCharacterization::Post(
       }
     }
   }
+}
+// R807 access-spec -> PUBLIC | PRIVATE
+void FeatureCharacterization::Post(const parser::AccessSpec &as) {
+  features["More control of access from a module"] = true;
+}
+void FeatureCharacterization::Post(const parser::Protected &as) {
+  features["More control of access from a module"] = true;
 }
 // R1409 use-stmt ->
 //         USE [[, module-nature] ::] module-name [, rename-list] |
@@ -520,7 +528,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Allocating a polymorphic variable (e.g. using MOLD= or
   // SOURCE=)"); checkMap("Assignment to an allocatable array");
   // checkMap("Transferring an allocation");
-  // checkMap("More control of access from a module");
+  checkMap("More control of access from a module");
   checkMap("Renaming operators on the USE statement");
   checkMap("Pointer assignment (rank remapping)");
   // checkMap("Pointer INTENT");

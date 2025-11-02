@@ -114,8 +114,12 @@ public:
   // - allocate and initialize with source keyword
   void Post(const parser::TypeDeclarationStmt &);
   void Post(const parser::AllocateStmt &allocateStmt);
-  /////// account for Allocatable stmt hopefully
+  // - Allocatable character length"
+  // - Allocatable scalars
   void Post(const parser::AllocatableStmt &allocatableStmt);
+  // - More control of access from a module
+  void Post(const parser::AccessSpec &as);
+  void Post(const parser::Protected &pt);
   // - Renaming operators on the USE staement
   // - Intrinsic modules
   void Post(const parser::UseStmt &us);
