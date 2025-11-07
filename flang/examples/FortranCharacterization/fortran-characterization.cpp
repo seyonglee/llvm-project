@@ -177,6 +177,15 @@ std::vector<std::string>
     FeatureCharacterization::Fortran2003_interop_c_procedures{"c_ptr",
         "c_funptr", "c_null_funptr", "c_loc", "c_funloc", "c_associated",
         "c_f_pointer", "c_f_procpointer"};
+std::vector<std::string>
+    FeatureCharacterization::Fortran2003_interop_c_intrinsictypes{"c_int",
+        "c_short", "c_long", "c_long_long", "c_signed_char", "c_size_t",
+        "c_int8_t", "c_int16_t", "c_int32_t", "c_int64_t", "c_int_least8_t",
+        "c_int_least16_t", "c_int_least32_t", "c_int_least64_t",
+        "c_int_fast8_t", "c_int_fast16_t", "c_int_fast32_t", "c_int_fast64_t",
+        "c_intmax_t", "c_intptr_t", "c_float", "c_double", "c_long_double",
+        "c_float_complex", "c_double_complex", "c_long_double_complex",
+        "c_bool", "c_char"};
 // R1512 procedure-declaration-stmt ->
 //         PROCEDURE ( [proc-interface] ) [[, proc-attr-spec]... ::]
 //         proc-decl-list
@@ -223,11 +232,91 @@ void FeatureCharacterization::Post(const parser::EnumDef &ed) {
 void FeatureCharacterization::Post(const parser::AssociateConstruct &) {
   features["ASSOCIATE construct"] = true;
 }
+// R703 declaration-type-spec ->
+//        intrinsic-type-spec | TYPE ( intrinsic-type-spec ) |
+//        TYPE ( derived-type-spec ) | CLASS ( derived-type-spec ) |
+//        CLASS ( * ) | TYPE ( * )
+// Legacy extension: RECORD /struct/
 void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
   if (std::get_if<parser::DeclarationTypeSpec::Class>(&dts.u)) {
     features["Polymorphic entities"] = true;
   } else if (std::get_if<parser::DeclarationTypeSpec::ClassStar>(&dts.u)) {
     features["Polymorphic entities"] = true;
+  } else if (const auto *const intrT{
+                 std::get_if<parser::IntrinsicTypeSpec>(&dts.u)}) {
+    auto check_interop_intrinsic_types = [&](KindSelector const &kindS) {
+      if (const auto *const cExpr{
+              std::get_if<parser::ScalarIntConstantExpr>(&kindS.u)}) {
+        const auto &kindExp{cExpr->thing.thing.thing.value()};
+        if (const auto *const dsn{
+                std::get_if<Indirection<Designator>>(&kindExp.u)}) {
+          if (const auto *const dref{std::get_if<DataRef>(&dsn->value().u)}) {
+            if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+              CONVERT2LOWERCASE(tname->ToString(), tnString);
+              auto it = std::find(Fortran2003_interop_c_intrinsictypes.begin(),
+                  Fortran2003_interop_c_intrinsictypes.end(), tnString);
+              if (it != Fortran2003_interop_c_intrinsictypes.end()) {
+                features["Interoperability of intrinsic types"] = true;
+              } else {
+              }
+            }
+          }
+        }
+      }
+    };
+    if (const auto *const realT{
+            std::get_if<parser::IntrinsicTypeSpec::Real>(&intrT->u)}) {
+      if (realT->kind.has_value()) {
+        check_interop_intrinsic_types(realT->kind.value());
+      }
+    } else if (const auto *const intT{
+                   std::get_if<parser::IntegerTypeSpec>(&intrT->u)}) {
+      if (intT->v.has_value()) {
+        check_interop_intrinsic_types(intT->v.value());
+      }
+    } else if (const auto *const compT{
+                   std::get_if<parser::IntrinsicTypeSpec::Complex>(
+                       &intrT->u)}) {
+      if (compT->kind.has_value()) {
+        check_interop_intrinsic_types(compT->kind.value());
+      }
+    } else if (const auto *const logicT{
+                   std::get_if<parser::IntrinsicTypeSpec::Logical>(
+                       &intrT->u)}) {
+      if (logicT->kind.has_value()) {
+        check_interop_intrinsic_types(logicT->kind.value());
+      }
+    } else if (const auto *const charT{
+                   std::get_if<parser::IntrinsicTypeSpec::Character>(
+                       &intrT->u)}) {
+      if (charT->selector.has_value()) {
+        if (const auto *const ls{std::get_if<parser::LengthSelector>(
+                &charT->selector.value().u)}) {
+          if (const auto *const tpv{
+                  std::get_if<parser::TypeParamValue>(&ls->u)}) {
+            if (const auto *const sie{
+                    std::get_if<parser::ScalarIntExpr>(&tpv->u)}) {
+              const auto &kindExp(sie->thing.thing.value());
+              if (const auto *const dsn{
+                      std::get_if<Indirection<Designator>>(&kindExp.u)}) {
+                if (const auto *const dref{
+                        std::get_if<DataRef>(&dsn->value().u)}) {
+                  if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                    CONVERT2LOWERCASE(tname->ToString(), tnString);
+                    auto it = std::find(
+                        Fortran2003_interop_c_intrinsictypes.begin(),
+                        Fortran2003_interop_c_intrinsictypes.end(), tnString);
+                    if (it != Fortran2003_interop_c_intrinsictypes.end()) {
+                      features["Interoperability of intrinsic types"] = true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 // R1153 select-type-construct ->
@@ -265,7 +354,7 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
     }
   }
 
-  if (const auto &its{std::get_if<parser::IntrinsicTypeSpec>(&dts.u)}) {
+  if (const auto *const its{std::get_if<parser::IntrinsicTypeSpec>(&dts.u)}) {
     if (std::holds_alternative<parser::IntrinsicTypeSpec::Character>(its->u)) {
       features["Allocatable character length"] = true;
     } else {
@@ -332,12 +421,12 @@ void FeatureCharacterization::Post(const parser::UseStmt &us) {
       features["Intrinsic modules"] = true;
     }
   }
-  if (const auto &renameList{std::get_if<std::list<Rename>>(&us.u)}) {
+  if (const auto *const renameList{std::get_if<std::list<Rename>>(&us.u)}) {
     if (renameList->begin() != renameList->end()) {
       features["Renaming operators on the USE statement"] = true;
     }
   }
-  if (const auto &onlyList{std::get_if<std::list<Only>>(&us.u)}) {
+  if (const auto *const onlyList{std::get_if<std::list<Only>>(&us.u)}) {
     for (const Only &o : *onlyList) {
       if (std::holds_alternative<Rename>(o.u)) {
         features["Renaming operators on the USE statement"] = true;
@@ -347,7 +436,8 @@ void FeatureCharacterization::Post(const parser::UseStmt &us) {
 }
 void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
   const auto &bounds{std::get<PointerAssignmentStmt::Bounds>(pas.t)};
-  if (const auto &brList{std::get_if<std::list<BoundsRemapping>>(&bounds.u)}) {
+  if (const auto *const brList{
+          std::get_if<std::list<BoundsRemapping>>(&bounds.u)}) {
     if (!brList->empty()) {
       features["Pointer assignment (rank remapping)"] = true;
     }
@@ -361,7 +451,7 @@ void FeatureCharacterization::Post(const parser::ImportStmt &is) {
 void FeatureCharacterization::Post(const parser::Call &c) {
   const auto &actArgSpecs{std::get<std::list<ActualArgSpec>>(c.t)};
   const auto &pd{std::get<ProcedureDesignator>(c.t)};
-  if (const auto &name{std::get_if<Name>(&pd.u)}) {
+  if (const auto *const name{std::get_if<Name>(&pd.u)}) {
     CONVERT2LOWERCASE(name->ToString(), fnName);
     if (fnName == "get_command_argument" ||
         fnName == "command_argument_count" ||
@@ -400,10 +490,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
   }
 }
 void FeatureCharacterization::Post(const parser::IoControlSpec &iocs) {
-  if (const auto &format{std::get_if<Format>(&iocs.u)}) {
-    if (const auto &expr{std::get_if<Expr>(&format->u)}) {
-      if (const auto &ls{std::get_if<LiteralConstant>(&expr->u)}) {
-        if (const auto &cls{std::get_if<CharLiteralConstant>(&ls->u)}) {
+  if (const auto *const format{std::get_if<Format>(&iocs.u)}) {
+    if (const auto *const expr{std::get_if<Expr>(&format->u)}) {
+      if (const auto *const ls{std::get_if<LiteralConstant>(&expr->u)}) {
+        if (const auto *const cls{std::get_if<CharLiteralConstant>(&ls->u)}) {
           std::string fmtString{cls->GetString()};
           if (fmtString.find("DT") != std::string::npos ||
               fmtString.find("dt") != std::string::npos ||
@@ -421,7 +511,7 @@ void FeatureCharacterization::Post(const parser::IoControlSpec &iocs) {
 //        final-procedure-stmt
 void FeatureCharacterization::Post(const parser::TypeBoundProcBinding &tbpb) {
   features["Procedures bound by name to a type (type-bound procedures)"] = true;
-  if (const auto &tbgs{std::get_if<TypeBoundGenericStmt>(&tbpb.u)}) {
+  if (const auto *const tbgs{std::get_if<TypeBoundGenericStmt>(&tbpb.u)}) {
     const auto &genericSpec{std::get<Indirection<GenericSpec>>(tbgs->t)};
     // if (const auto *definedOp{
     //         std::get_if<parser::DefinedOperator>(&genericSpec.value().u)})
@@ -513,8 +603,8 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("The PASS attribute");
   checkMap("Procedures bound to a type as operators");
   checkMap("Type extension");
-  // discuss why we need semantics here and why we won't be including it anymore
-  // checkMap("Overriding a type-bound procedure");
+  // discuss why we need semantics here and why we won't be including it
+  // anymore checkMap("Overriding a type-bound procedure");
   checkMap("Enumerations");
   checkMap("ASSOCIATE construct");
   checkMap("Polymorphic entities");
@@ -558,7 +648,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Intrinsic function for newline character");
   // checkMap("I/O of IEEE exceptional values");
   // checkMap("Comma after a P edit descriptor");
-  // checkMap("Interoperability of intrinsic types");
+  checkMap("Interoperability of intrinsic types");
   checkMap("Interoperability with C pointers");
   checkMap("Interoperability of derived types");
   // checkMap("Interoperability of variables");
@@ -605,11 +695,9 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Bit transformational functions");
   // checkMap("Storage size");
   // checkMap("Optional argument radix added to selected real kind");
-  // checkMap("Extensions to trigonometric and hyperbolic intrinsic functions");
-  // checkMap("Bessel functions");
-  // checkMap("Error and gamma functions");
-  // checkMap("Euclidean vector norms");
-  // checkMap("Parity");
+  // checkMap("Extensions to trigonometric and hyperbolic intrinsic
+  // functions"); checkMap("Bessel functions"); checkMap("Error and gamma
+  // functions"); checkMap("Euclidean vector norms"); checkMap("Parity");
   // checkMap("Execute command line");
   // checkMap("Optional back argument added to maxloc and minloc");
   // checkMap("Find location in an array");
@@ -620,10 +708,11 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Optional argument for ieee_selected_real_kind");
   // checkMap("Save attribute for module and submodule data");
   // checkMap("Empty contains part");
-  // checkMap("Form of the end statement for an internal or module procedure");
-  // checkMap("Internal procedure as an actual argument");
+  // checkMap("Form of the end statement for an internal or module
+  // procedure"); checkMap("Internal procedure as an actual argument");
   // checkMap(
-  //    "Null pointer or unallocated allocatable as an absent dummy argument");
+  //    "Null pointer or unallocated allocatable as an absent dummy
+  //    argument");
   // checkMap("Non-pointer actual for pointer dummy argument");
   // checkMap("Impure elemental procedures");
   // checkMap("Generic resolution by procedureness");

@@ -88,6 +88,7 @@ public:
   // Fortran 2003's New Features //
   /////////////////////////////////
   static std::vector<std::string> Fortran2003_interop_c_procedures;
+  static std::vector<std::string> Fortran2003_interop_c_intrinsictypes;
   // - procedure pointers
   void Post(const parser::ProcedureDeclarationStmt &);
   // - parameterized derived types
@@ -105,6 +106,7 @@ public:
   void Post(const parser::EnumDef &);
   void Post(const parser::AssociateConstruct &);
   // - Polymorphic Entities
+  // - Interoperability of intrinsic types
   void Post(const parser::DeclarationTypeSpec &);
   // - SELECT TYPE construct
   void Post(const parser::SelectTypeConstruct &);
@@ -129,7 +131,6 @@ public:
   void Post(const parser::ImportStmt &is);
   // - Access to the computing environment
   //   (Command line processing)
-  // - Interoperability of intrinsic types
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
