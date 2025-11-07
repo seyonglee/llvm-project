@@ -242,6 +242,14 @@ void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
     features["Polymorphic entities"] = true;
   } else if (std::get_if<parser::DeclarationTypeSpec::ClassStar>(&dts.u)) {
     features["Polymorphic entities"] = true;
+  } else if (const auto *const typeT{
+                 std::get_if<parser::DeclarationTypeSpec::Type>(&dts.u)}) {
+    const auto &tname{std::get<Name>(typeT->derived.t)};
+    CONVERT2LOWERCASE(tname.ToString(), tnString);
+    if ((tnString.compare("c_funptr") == 0) ||
+        (tnString.compare("c_ptr") == 0)) {
+      features["Interoperability with C pointers"] = true;
+    }
   } else if (const auto *const intrT{
                  std::get_if<parser::IntrinsicTypeSpec>(&dts.u)}) {
     auto check_interop_intrinsic_types = [&](KindSelector const &kindS) {
