@@ -107,16 +107,22 @@ public:
   void Post(const parser::AssociateConstruct &);
   // - Polymorphic Entities
   // - Interoperability of intrinsic types
+  // - Interoperability with C pointers
+  // - Interoperability of variables
+  void checkDeclarationTypeSpec(const parser::DeclarationTypeSpec &, bool);
   void Post(const parser::DeclarationTypeSpec &);
   // - SELECT TYPE construct
   void Post(const parser::SelectTypeConstruct &);
   // - deferred bindings
   void Post(const parser::BindAttr &);
-  // - Allocatable scalar and
-  // - allocate and initialize with source keyword
+  // - Allocatable scalars
+  // - Allocatable character length
   void Post(const parser::TypeDeclarationStmt &);
+  // - Allocatable scalars
+  // - Allocatable character length
+  void Post(const parser::DataComponentDefStmt &);
   void Post(const parser::AllocateStmt &allocateStmt);
-  // - Allocatable character length"
+  // - Allocatable character length
   // - Allocatable scalars
   void Post(const parser::AllocatableStmt &allocatableStmt);
   // - More control of access from a module

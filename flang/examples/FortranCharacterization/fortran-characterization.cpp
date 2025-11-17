@@ -3,6 +3,7 @@
 
 // attributes of interest
 #include "fortran-characterization.h"
+#include "flang/Parser/parse-tree.h"
 
 // Convert inputString to lowercases and store in a variable lName
 #define CONVERT2LOWERCASE(inputString, lName) \
@@ -237,7 +238,8 @@ void FeatureCharacterization::Post(const parser::AssociateConstruct &) {
 //        TYPE ( derived-type-spec ) | CLASS ( derived-type-spec ) |
 //        CLASS ( * ) | TYPE ( * )
 // Legacy extension: RECORD /struct/
-void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
+void FeatureCharacterization::checkDeclarationTypeSpec(
+    const parser::DeclarationTypeSpec &dts, bool is_poa) {
   if (std::get_if<parser::DeclarationTypeSpec::Class>(&dts.u)) {
     features["Polymorphic entities"] = true;
   } else if (std::get_if<parser::DeclarationTypeSpec::ClassStar>(&dts.u)) {
@@ -265,7 +267,9 @@ void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
                   Fortran2003_interop_c_intrinsictypes.end(), tnString);
               if (it != Fortran2003_interop_c_intrinsictypes.end()) {
                 features["Interoperability of intrinsic types"] = true;
-              } else {
+                if (!is_poa) {
+                  features["Interoperability of variables"] = true;
+                }
               }
             }
           }
@@ -304,19 +308,49 @@ void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
                   std::get_if<parser::TypeParamValue>(&ls->u)}) {
             if (const auto *const sie{
                     std::get_if<parser::ScalarIntExpr>(&tpv->u)}) {
-              const auto &kindExp(sie->thing.thing.value());
+              const auto &kindExp{sie->thing.thing.value()};
               if (const auto *const dsn{
                       std::get_if<Indirection<Designator>>(&kindExp.u)}) {
                 if (const auto *const dref{
                         std::get_if<DataRef>(&dsn->value().u)}) {
                   if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
                     CONVERT2LOWERCASE(tname->ToString(), tnString);
-                    auto it = std::find(
-                        Fortran2003_interop_c_intrinsictypes.begin(),
-                        Fortran2003_interop_c_intrinsictypes.end(), tnString);
-                    if (it != Fortran2003_interop_c_intrinsictypes.end()) {
+                    if (tnString.compare("c_char")) {
                       features["Interoperability of intrinsic types"] = true;
+                      if (!is_poa) {
+                        features["Interoperability of variables"] = true;
+                      }
                     }
+                  }
+                }
+              }
+            }
+          }
+        } else if (const auto *const lk{
+                       std::get_if<parser::CharSelector::LengthAndKind>(
+                           &charT->selector.value().u)}) {
+          if (lk->length.has_value()) {
+            if (const auto *const sie{std::get_if<parser::ScalarIntExpr>(
+                    &lk->length.value().u)}) {
+              const auto &lenExp{sie->thing.thing.value()};
+              if (const auto *const lc{
+                      std::get_if<parser::LiteralConstant>(&lenExp.u)}) {
+                if (const auto *const ilc{
+                        std::get_if<parser::IntLiteralConstant>(&lc->u)}) {
+                }
+              }
+            }
+          }
+          const auto &kindExp{lk->kind.thing.thing.thing.value()};
+          if (const auto *const dsn{
+                  std::get_if<Indirection<Designator>>(&kindExp.u)}) {
+            if (const auto *const dref{std::get_if<DataRef>(&dsn->value().u)}) {
+              if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                CONVERT2LOWERCASE(tname->ToString(), tnString);
+                if (tnString.compare("c_char")) {
+                  features["Interoperability of intrinsic types"] = true;
+                  if (!is_poa) {
+                    features["Interoperability of variables"] = true;
                   }
                 }
               }
@@ -326,6 +360,11 @@ void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
       }
     }
   }
+}
+// FIXME We dont need this if checkDeclarationTypeSpec() is called in all places
+// containing DeclarationTypeSpec.
+void FeatureCharacterization::Post(const parser::DeclarationTypeSpec &dts) {
+  checkDeclarationTypeSpec(dts, true);
 }
 // R1153 select-type-construct ->
 //           select-type stmt [type-guard-stmt block]...end-select-type-stmt
@@ -337,40 +376,114 @@ void FeatureCharacterization::Post(const parser::BindAttr &ba) {
     features["Deferred bindings and abstract types"] = true;
   }
 }
+// FIXME need to check other statement containing DeclarationTypeSpec
 void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   const auto &dts{std::get<parser::DeclarationTypeSpec>(tds.t)};
   const auto &attrSpecList{std::get<std::list<parser::AttrSpec>>(tds.t)};
   const auto &entityDeclList{std::get<std::list<parser::EntityDecl>>(tds.t)};
 
-  // check AttrSpecList to see if Allocatable is in there
+  // check AttrSpecList to see if Allocatable or Pointer is in there
   bool allocatableSpec{false};
+  bool pointerSpec{false};
+  bool arraySpec{false};
+  bool coarraySpec{false};
   for (const parser::AttrSpec &attrSpec : attrSpecList) {
     if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
       allocatableSpec = true;
-      break;
+    }
+    if (std::holds_alternative<parser::Pointer>(attrSpec.u)) {
+      pointerSpec = true;
+    }
+    if (std::holds_alternative<parser::ArraySpec>(attrSpec.u)) {
+      arraySpec = true;
+    }
+    if (std::holds_alternative<parser::CoarraySpec>(attrSpec.u)) {
+      coarraySpec = true;
     }
   }
-  if (!allocatableSpec) {
-    return;
-  }
-
-  // if there is an arrayspec, it's not a scalar
-  for (const parser::EntityDecl &ed : entityDeclList) {
-    // const auto &arrSpec{std::get<parser::ArraySpec>(ed)};
-    if (std::get<std::optional<parser::ArraySpec>>(ed.t).has_value()) {
+  checkDeclarationTypeSpec(dts, pointerSpec || allocatableSpec);
+  if (allocatableSpec) {
+    // if there is an arrayspec, it's not a scalar
+    if (arraySpec || coarraySpec) {
       return;
     }
-  }
+    for (const parser::EntityDecl &ed : entityDeclList) {
+      if (std::get<std::optional<parser::ArraySpec>>(ed.t).has_value()) {
+        return;
+      }
+      if (std::get<std::optional<parser::CoarraySpec>>(ed.t).has_value()) {
+        return;
+      }
+    }
 
-  if (const auto *const its{std::get_if<parser::IntrinsicTypeSpec>(&dts.u)}) {
-    if (std::holds_alternative<parser::IntrinsicTypeSpec::Character>(its->u)) {
-      features["Allocatable character length"] = true;
+    if (const auto *const its{std::get_if<parser::IntrinsicTypeSpec>(&dts.u)}) {
+      if (std::holds_alternative<parser::IntrinsicTypeSpec::Character>(
+              its->u)) {
+        features["Allocatable character length"] = true;
+      } else {
+        features["Allocatable scalars"] = true;
+      }
     } else {
+      // All non-array types are scalar type.
       features["Allocatable scalars"] = true;
     }
-  } else {
-    // All non-array types are scalar type.
-    features["Allocatable scalars"] = true;
+  }
+}
+void FeatureCharacterization::Post(const parser::DataComponentDefStmt &dcd) {
+  const auto &dts{std::get<parser::DeclarationTypeSpec>(dcd.t)};
+  const auto &attrSpecList{std::get<std::list<ComponentAttrSpec>>(dcd.t)};
+  const auto &compFillList{std::get<std::list<ComponentOrFill>>(dcd.t)};
+
+  // check AttrSpecList to see if Allocatable or Pointer is in there
+  bool allocatableSpec{false};
+  bool pointerSpec{false};
+  bool compArraySpec{false};
+  bool coarraySpec{false};
+  for (const parser::ComponentAttrSpec &attrSpec : attrSpecList) {
+    if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
+      allocatableSpec = true;
+    }
+    if (std::holds_alternative<parser::Pointer>(attrSpec.u)) {
+      pointerSpec = true;
+    }
+    if (std::holds_alternative<parser::ComponentArraySpec>(attrSpec.u)) {
+      compArraySpec = true;
+    }
+    if (std::holds_alternative<parser::CoarraySpec>(attrSpec.u)) {
+      coarraySpec = true;
+    }
+  }
+  checkDeclarationTypeSpec(dts, pointerSpec || allocatableSpec);
+  if (allocatableSpec) {
+    // if there is an arrayspec, it's not a scalar
+    if (compArraySpec || coarraySpec) {
+      return;
+    }
+    for (const parser::ComponentOrFill &cf : compFillList) {
+      if (const auto *const cd{std::get_if<parser::ComponentDecl>(&cf.u)}) {
+        const auto &as{
+            std::get<std::optional<parser::ComponentArraySpec>>(cd->t)};
+        if (as.has_value()) {
+          return;
+        }
+        const auto &cas{std::get<std::optional<parser::CoarraySpec>>(cd->t)};
+        if (cas.has_value()) {
+          return;
+        }
+      }
+    }
+
+    if (const auto *const its{std::get_if<parser::IntrinsicTypeSpec>(&dts.u)}) {
+      if (std::holds_alternative<parser::IntrinsicTypeSpec::Character>(
+              its->u)) {
+        features["Allocatable character length"] = true;
+      } else {
+        features["Allocatable scalars"] = true;
+      }
+    } else {
+      // All non-array types are scalar type.
+      features["Allocatable scalars"] = true;
+    }
   }
 }
 void FeatureCharacterization::Post(const parser::AllocateStmt &allocateStmt) {
