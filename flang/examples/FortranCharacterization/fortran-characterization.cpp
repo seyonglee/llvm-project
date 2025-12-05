@@ -383,28 +383,31 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   const auto &entityDeclList{std::get<std::list<parser::EntityDecl>>(tds.t)};
 
   // check AttrSpecList to see if Allocatable or Pointer is in there
-  bool allocatableSpec{false};
-  bool pointerSpec{false};
-  bool arraySpec{false};
-  bool coarraySpec{false};
+  bool allocatableAttr{false};
+  bool pointerAttr{false};
+  bool arraySpecAttr{false};
+  bool coarraySpecAttr{false};
   for (const parser::AttrSpec &attrSpec : attrSpecList) {
     if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
-      allocatableSpec = true;
+      allocatableAttr = true;
     }
     if (std::holds_alternative<parser::Pointer>(attrSpec.u)) {
-      pointerSpec = true;
+      pointerAttr = true;
     }
     if (std::holds_alternative<parser::ArraySpec>(attrSpec.u)) {
-      arraySpec = true;
+      arraySpecAttr = true;
     }
     if (std::holds_alternative<parser::CoarraySpec>(attrSpec.u)) {
-      coarraySpec = true;
+      coarraySpecAttr = true;
+    }
+    if (std::holds_alternative<parser::LanguageBindingSpec>(attrSpec.u)) {
+      features["Interoperability of global data"] = true;
     }
   }
-  checkDeclarationTypeSpec(dts, pointerSpec || allocatableSpec);
-  if (allocatableSpec) {
+  checkDeclarationTypeSpec(dts, pointerAttr || allocatableAttr);
+  if (allocatableAttr) {
     // if there is an arrayspec, it's not a scalar
-    if (arraySpec || coarraySpec) {
+    if (arraySpecAttr || coarraySpecAttr) {
       return;
     }
     for (const parser::EntityDecl &ed : entityDeclList) {
@@ -435,28 +438,28 @@ void FeatureCharacterization::Post(const parser::DataComponentDefStmt &dcd) {
   const auto &compFillList{std::get<std::list<ComponentOrFill>>(dcd.t)};
 
   // check AttrSpecList to see if Allocatable or Pointer is in there
-  bool allocatableSpec{false};
-  bool pointerSpec{false};
-  bool compArraySpec{false};
-  bool coarraySpec{false};
+  bool allocatableAttr{false};
+  bool pointerAttr{false};
+  bool compArraySpecAttr{false};
+  bool coarraySpecAttr{false};
   for (const parser::ComponentAttrSpec &attrSpec : attrSpecList) {
     if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
-      allocatableSpec = true;
+      allocatableAttr = true;
     }
     if (std::holds_alternative<parser::Pointer>(attrSpec.u)) {
-      pointerSpec = true;
+      pointerAttr = true;
     }
     if (std::holds_alternative<parser::ComponentArraySpec>(attrSpec.u)) {
-      compArraySpec = true;
+      compArraySpecAttr = true;
     }
     if (std::holds_alternative<parser::CoarraySpec>(attrSpec.u)) {
-      coarraySpec = true;
+      coarraySpecAttr = true;
     }
   }
-  checkDeclarationTypeSpec(dts, pointerSpec || allocatableSpec);
-  if (allocatableSpec) {
+  checkDeclarationTypeSpec(dts, pointerAttr || allocatableAttr);
+  if (allocatableAttr) {
     // if there is an arrayspec, it's not a scalar
-    if (compArraySpec || coarraySpec) {
+    if (compArraySpecAttr || coarraySpecAttr) {
       return;
     }
     for (const parser::ComponentOrFill &cf : compFillList) {
@@ -671,8 +674,24 @@ void FeatureCharacterization::Post(const parser::InterfaceStmt &is) {
 void FeatureCharacterization::Post(const parser::TypeAttrSpec::BindC &) {
   features["Interoperability of derived types"] = true;
 }
-void FeatureCharacterization::Post(const parser::LanguageBindingSpec &) {
-  features["Interoperability of derived types"] = true;
+void FeatureCharacterization::Post(const parser::ProcAttrSpec &pas) {
+  if (std::get_if<parser::LanguageBindingSpec>(&pas.u)) {
+    features["Interoperability of procedures"] = true;
+  }
+}
+void FeatureCharacterization::Post(const parser::Suffix &sfx) {
+  if (sfx.binding.has_value()) {
+    features["Interoperability of procedures"] = true;
+  }
+}
+void FeatureCharacterization::Post(const parser::SubroutineStmt &sts) {
+  const auto &lbinding{std::get<std::optional<LanguageBindingSpec>>(sts.t)};
+  if (lbinding.has_value()) {
+    features["Interoperability of procedures"] = true;
+  }
+}
+void FeatureCharacterization::Post(const parser::BindStmt &) {
+  features["Interoperability of global data"] = true;
 }
 
 /* Fortran 2008's New Features */
@@ -772,9 +791,9 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Interoperability of intrinsic types");
   checkMap("Interoperability with C pointers");
   checkMap("Interoperability of derived types");
-  // checkMap("Interoperability of variables");
-  // checkMap("Interoperability of procedures");
-  // checkMap("Interoperability of global data");
+  checkMap("Interoperability of variables");
+  checkMap("Interoperability of procedures");
+  checkMap("Interoperability of global data");
   out_ << "}\n";
 
   out_ << "Fortran 2008's New Features {\n";

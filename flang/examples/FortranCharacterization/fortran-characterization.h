@@ -117,6 +117,7 @@ public:
   void Post(const parser::BindAttr &);
   // - Allocatable scalars
   // - Allocatable character length
+  // - Interoperability of global data
   void Post(const parser::TypeDeclarationStmt &);
   // - Allocatable scalars
   // - Allocatable character length
@@ -144,7 +145,12 @@ public:
   void Post(const parser::InterfaceStmt &is);
   // - Interoperability of derived types
   void Post(const parser::TypeAttrSpec::BindC &);
-  void Post(const parser::LanguageBindingSpec &);
+  // - Interoperability of procedures
+  void Post(const parser::ProcAttrSpec &);
+  void Post(const parser::Suffix &);
+  void Post(const parser::SubroutineStmt &);
+  // - Interoperability of global data
+  void Post(const parser::BindStmt &);
   void Post(const parser::DoConstruct &node);
 
 protected:
