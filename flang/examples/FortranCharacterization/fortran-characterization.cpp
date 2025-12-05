@@ -3,6 +3,7 @@
 
 // attributes of interest
 #include "fortran-characterization.h"
+#include "flang/Common/indirection.h"
 #include "flang/Parser/parse-tree.h"
 
 // Convert inputString to lowercases and store in a variable lName
@@ -599,6 +600,23 @@ void FeatureCharacterization::Post(const parser::Call &c) {
           }
         }
       }
+    } else if (fnName == "selected_int_kind") {
+      for (const auto &arg : actArgSpecs) {
+        const auto &argSpec = std::get<ActualArg>(arg.t);
+        if (const auto *argExpr =
+                std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+          if (const auto *const lc{
+                  std::get_if<LiteralConstant>(&argExpr->value().u)}) {
+            if (const auto *const ilc{
+                    std::get_if<IntLiteralConstant>(&lc->u)}) {
+              const auto &ilcStr = std::get<CharBlock>(ilc->t);
+              if (ilcStr.ToString() == "18") {
+                features["Long integers"] = true;
+              }
+            }
+          }
+        }
+      }
     } else {
       for (const auto &p : Fortran2003_interop_c_procedures) {
         if (fnName == p) {
@@ -822,7 +840,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Contiguous attribute");
   // checkMap("Simply contiguous arrays rank remapping to rank>1 target");
   // checkMap("Maximum rank");
-  // checkMap("Long integers");
+  checkMap("Long integers");
   // checkMap("Allocatable components of recursive type");
   // checkMap("Implied-shape array");
   // checkMap("Pointer initialization with SAVE attribute");

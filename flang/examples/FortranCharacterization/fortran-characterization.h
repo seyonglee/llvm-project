@@ -138,6 +138,7 @@ public:
   void Post(const parser::ImportStmt &is);
   // - Access to the computing environment
   //   (Command line processing)
+  // - Long integers (Fortran 2008)
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
@@ -166,7 +167,6 @@ public:
   void Post(const parser::ContiguousStmt &);
   // - Simply contiguous arrays rank remapping to rank>1 target
   // - Maximum rank
-  // - Long integers
   // - Allocatable components of recursive type
   // - Implied-shape array
   // - Pointer initialization with SAVE attribute
