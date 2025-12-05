@@ -694,13 +694,32 @@ void FeatureCharacterization::Post(const parser::BindStmt &) {
   features["Interoperability of global data"] = true;
 }
 
-/* Fortran 2008's New Features */
+/////////////////////////////////
+// Fortran 2008's New Features //
+/////////////////////////////////
+void FeatureCharacterization::Post(const parser::SubmoduleStmt &) {
+  features["Submodules"] = true;
+}
 void FeatureCharacterization::Post(const parser::DoConstruct &node) {
   features["do concurrent"] = node.IsDoConcurrent();
 }
+void FeatureCharacterization::Post(const parser::AttrSpec &at) {
+  if (std::get_if<parser::Contiguous>(&at.u)) {
+    features["Contiguous attribute"] = true;
+  }
+}
+void FeatureCharacterization::Post(const parser::ComponentAttrSpec &cat) {
+  if (std::get_if<parser::Contiguous>(&cat.u)) {
+    features["Contiguous attribute"] = true;
+  }
+}
+void FeatureCharacterization::Post(const parser::ContiguousStmt &) {
+  features["Contiguous attribute"] = true;
+}
 
-/* Fortran 2018's New Features */
-
+/////////////////////////////////
+// Fortran 2018's New Features //
+/////////////////////////////////
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
   out_ << "\t\"" << key << "\": ";
@@ -797,10 +816,10 @@ void FeatureCharacterization::checkAllFeatures() {
   out_ << "}\n";
 
   out_ << "Fortran 2008's New Features {\n";
-  // checkMap("Submodules");
+  checkMap("Submodules");
   // checkMap("Coarrays");
   checkMap("do concurrent");
-  // checkMap("Contiguous attribute");
+  checkMap("Contiguous attribute");
   // checkMap("Simply contiguous arrays rank remapping to rank>1 target");
   // checkMap("Maximum rank");
   // checkMap("Long integers");

@@ -151,7 +151,29 @@ public:
   void Post(const parser::SubroutineStmt &);
   // - Interoperability of global data
   void Post(const parser::BindStmt &);
-  void Post(const parser::DoConstruct &node);
+
+  /////////////////////////////////
+  // Fortran 2008's New Features //
+  /////////////////////////////////
+  // - Submodules
+  void Post(const parser::SubmoduleStmt &);
+  // - Coarrays
+  // - do concurrent
+  void Post(const parser::DoConstruct &);
+  // - Contiguous attribute
+  void Post(const parser::AttrSpec &);
+  void Post(const parser::ComponentAttrSpec &);
+  void Post(const parser::ContiguousStmt &);
+  // - Simply contiguous arrays rank remapping to rank>1 target
+  // - Maximum rank
+  // - Long integers
+  // - Allocatable components of recursive type
+  // - Implied-shape array
+  // - Pointer initialization with SAVE attribute
+  // - Kind of a forall index
+  // - Type statement for intrinsic types
+  // - Declaring type-bound procedures
+  // - Extensions to value attribute
 
 protected:
 private:
