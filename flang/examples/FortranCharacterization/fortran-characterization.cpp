@@ -388,6 +388,8 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   bool pointerAttr{false};
   bool arraySpecAttr{false};
   bool coarraySpecAttr{false};
+  bool saveAttr{false};
+  bool targetAttr{false};
   for (const parser::AttrSpec &attrSpec : attrSpecList) {
     if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
       allocatableAttr = true;
@@ -404,6 +406,15 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
     if (std::holds_alternative<parser::LanguageBindingSpec>(attrSpec.u)) {
       features["Interoperability of global data"] = true;
     }
+    if (std::holds_alternative<parser::Save>(attrSpec.u)) {
+      saveAttr = true;
+    }
+    if (std::holds_alternative<parser::Target>(attrSpec.u)) {
+      targetAttr = true;
+    }
+  }
+  if (saveAttr && targetAttr) {
+    features["Pointer initialization with SAVE attribute"] = true;
   }
   checkDeclarationTypeSpec(dts, pointerAttr || allocatableAttr);
   if (allocatableAttr) {
@@ -843,7 +854,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Long integers");
   // checkMap("Allocatable components of recursive type");
   // checkMap("Implied-shape array");
-  // checkMap("Pointer initialization with SAVE attribute");
+  checkMap("Pointer initialization with SAVE attribute");
   // checkMap("Kind of a forall index");
   // checkMap("Type statement for intrinsic types");
   // checkMap("Declaring type-bound procedures");

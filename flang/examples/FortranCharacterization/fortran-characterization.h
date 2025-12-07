@@ -118,6 +118,7 @@ public:
   // - Allocatable scalars
   // - Allocatable character length
   // - Interoperability of global data
+  // - Pointer initialization with SAVE attribute (Fortran 2008)
   void Post(const parser::TypeDeclarationStmt &);
   // - Allocatable scalars
   // - Allocatable character length
