@@ -172,6 +172,7 @@ public:
   // - Implied-shape array
   // - Pointer initialization with SAVE attribute
   // - Kind of a forall index
+  void Post(const parser::ConcurrentHeader &);
   // - Type statement for intrinsic types
   // - Declaring type-bound procedures
   // - Extensions to value attribute

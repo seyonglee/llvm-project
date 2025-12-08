@@ -745,6 +745,17 @@ void FeatureCharacterization::Post(const parser::ComponentAttrSpec &cat) {
 void FeatureCharacterization::Post(const parser::ContiguousStmt &) {
   features["Contiguous attribute"] = true;
 }
+void FeatureCharacterization::Post(const parser::ConcurrentHeader &ch) {
+  const auto &intTypeSpec{std::get<std::optional<IntegerTypeSpec>>(ch.t)};
+  if (intTypeSpec.has_value()) {
+    if (intTypeSpec.value().v.has_value()) {
+      const auto &kindSpec{intTypeSpec.value().v.value()};
+      if (std::get_if<parser::ScalarIntConstantExpr>(&kindSpec.u)) {
+        features["Kind of a forall index"] = true;
+      }
+    }
+  }
+}
 
 /////////////////////////////////
 // Fortran 2018's New Features //
@@ -855,7 +866,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Allocatable components of recursive type");
   // checkMap("Implied-shape array");
   checkMap("Pointer initialization with SAVE attribute");
-  // checkMap("Kind of a forall index");
+  checkMap("Kind of a forall index");
   // checkMap("Type statement for intrinsic types");
   // checkMap("Declaring type-bound procedures");
   // checkMap("Extensions to value attribute");
