@@ -766,6 +766,9 @@ void FeatureCharacterization::Post(const parser::ConcurrentHeader &ch) {
     }
   }
 }
+void FeatureCharacterization::Post(const parser::ConnectSpec::Newunit &) {
+  features["Finding a unit when opening a file (newunit=u)"] = true;
+}
 
 /////////////////////////////////
 // Fortran 2018's New Features //
@@ -886,7 +889,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Accessing real and imaginary parts");
   // checkMap("Pointer functions");
   // checkMap("Elemental dummy argument restrictions lifted");
-  // checkMap("Finding a unit when opening a file (newunit=u)");
+  checkMap("Finding a unit when opening a file (newunit=u)");
   // checkMap("g0 edit descriptor");
   // checkMap("Unlimited format item");
   // checkMap("Recursive I/O for an external unit");

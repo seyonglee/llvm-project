@@ -177,6 +177,8 @@ public:
   // - Type statement for intrinsic types
   // - Declaring type-bound procedures
   // - Extensions to value attribute
+  // - Finding a unit when opening a file (newunit=u)
+  void Post(const parser::ConnectSpec::Newunit &);
 
 protected:
 private:
