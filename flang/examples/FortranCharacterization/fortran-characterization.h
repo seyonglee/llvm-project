@@ -179,6 +179,8 @@ public:
   // - Extensions to value attribute
   // - Finding a unit when opening a file (newunit=u)
   void Post(const parser::ConnectSpec::Newunit &);
+  // - The BLOCK construct
+  void Post(const parser::BlockStmt &);
 
 protected:
 private:

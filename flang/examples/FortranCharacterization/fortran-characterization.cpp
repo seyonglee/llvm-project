@@ -769,6 +769,9 @@ void FeatureCharacterization::Post(const parser::ConcurrentHeader &ch) {
 void FeatureCharacterization::Post(const parser::ConnectSpec::Newunit &) {
   features["Finding a unit when opening a file (newunit=u)"] = true;
 }
+void FeatureCharacterization::Post(const parser::BlockStmt &) {
+  features["The BLOCK construct"] = true;
+}
 
 /////////////////////////////////
 // Fortran 2018's New Features //
@@ -893,7 +896,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("g0 edit descriptor");
   // checkMap("Unlimited format item");
   // checkMap("Recursive I/O for an external unit");
-  // checkMap("The BLOCK construct");
+  checkMap("The BLOCK construct");
   // checkMap("Exit statement allowed in almost any construct");
   // checkMap("STOP code");
   // checkMap("Bit sequence comparison");
