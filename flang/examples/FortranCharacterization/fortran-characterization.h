@@ -123,7 +123,6 @@ public:
   // - Allocatable scalars
   // - Allocatable character length
   void Post(const parser::DataComponentDefStmt &);
-  void Post(const parser::AllocateStmt &allocateStmt);
   // - Allocatable character length
   // - Allocatable scalars
   void Post(const parser::AllocatableStmt &allocatableStmt);
@@ -173,6 +172,8 @@ public:
   // - Pointer initialization with SAVE attribute
   // - Kind of a forall index
   void Post(const parser::ConcurrentHeader &);
+  // - Allocating a polymorphic variable using MOLD
+  void Post(const parser::AllocateStmt &allocateStmt);
   // - Type statement for intrinsic types
   // - Declaring type-bound procedures
   // - Extensions to value attribute

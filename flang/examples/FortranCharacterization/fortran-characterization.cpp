@@ -34,7 +34,6 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Structure constructors", false},
     {"The allocate statement (allocate with SOURCE)", false},
     {"Allocatable scalars", false}, {"Allocatable character length", false},
-    {"Allocating a polymorphic variable (e.g. using MOLD= or SOURCE=)", false},
     {"Assignment to an allocatable array", false},
     {"Transferring an allocation", false},
     {"More control of access from a module", false},
@@ -79,7 +78,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Extensions to value attribute", false},
     {"Omitting an allocatable component in a structure constructor", false},
     {"Multiple allocations with source=", false},
-    {"Copying the properties of an object in an ALLOCATE statement", false},
+    {"Allocating a polymorphic variable using MOLD", false},
     {"Copying bounds of source array in ALLOCATE", false},
     {"Polymorphic assignment", false},
     {"Accessing real and imaginary parts", false}, {"Pointer functions", false},
@@ -502,6 +501,17 @@ void FeatureCharacterization::Post(const parser::DataComponentDefStmt &dcd) {
   }
 }
 void FeatureCharacterization::Post(const parser::AllocateStmt &allocateStmt) {
+  const auto &allocOptions{
+      std::get<std::list<parser::AllocOpt>>(allocateStmt.t)};
+  if (allocOptions.size() > 0) {
+    for (const parser::AllocOpt &allocOption : allocOptions) {
+      if (std::get_if<parser::AllocOpt::Source>(&allocOption.u)) {
+        features["The allocate statement (allocate with SOURCE)"] = true;
+      } else if (std::get_if<parser::AllocOpt::Mold>(&allocOption.u)) {
+        features["Allocating a polymorphic variable using MOLD"] = true;
+      }
+    }
+  }
   /*if (auto info{CheckAllocateOptions(allocateStmt, context_)}) {
     for (const parser::Allocation &allocation :
         std::get<std::list<parser::Allocation>>(allocateStmt.t)) {
@@ -810,12 +820,10 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("SELECT TYPE construct");
   checkMap("Deferred bindings and abstract types");
   checkMap("Structure constructors");
-  // checkMap("The allocate statement (allocate with SOURCE)"); //We could do
-  // this
+  checkMap("The allocate statement (allocate with SOURCE)");
   checkMap("Allocatable scalars"); // Semantics
   checkMap("Allocatable character length"); // Semantics
-  // checkMap("Allocating a polymorphic variable (e.g. using MOLD= or
-  // SOURCE=)"); checkMap("Assignment to an allocatable array");
+  // checkMap("Assignment to an allocatable array");
   // checkMap("Transferring an allocation");
   checkMap("More control of access from a module");
   checkMap("Renaming operators on the USE statement");
@@ -872,7 +880,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Extensions to value attribute");
   // checkMap("Omitting an allocatable component in a structure constructor");
   // checkMap("Multiple allocations with source=");
-  // checkMap("Copying the properties of an object in an ALLOCATE statement");
+  checkMap("Allocating a polymorphic variable using MOLD");
   // checkMap("Copying bounds of source array in ALLOCATE");
   // checkMap("Polymorphic assignment");
   // checkMap("Accessing real and imaginary parts");
