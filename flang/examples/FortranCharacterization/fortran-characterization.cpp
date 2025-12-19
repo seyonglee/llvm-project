@@ -621,6 +621,18 @@ void FeatureCharacterization::Post(const parser::Call &c) {
           }
         }
       }
+    } else if (fnName == "maxloc" || fnName == "minloc") {
+      for (const auto &arg : actArgSpecs) {
+        const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+        if (optKeyword.has_value()) {
+          CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
+          if (kw == "back") {
+            features["Optional back argument added to maxloc and minloc"] =
+                true;
+            break;
+          }
+        }
+      }
     } else if (fnName == "selected_int_kind") {
       for (const auto &arg : actArgSpecs) {
         const auto &argSpec = std::get<ActualArg>(arg.t);
@@ -914,7 +926,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // functions"); checkMap("Bessel functions"); checkMap("Error and gamma
   // functions"); checkMap("Euclidean vector norms"); checkMap("Parity");
   // checkMap("Execute command line");
-  // checkMap("Optional back argument added to maxloc and minloc");
+  checkMap("Optional back argument added to maxloc and minloc");
   // checkMap("Find location in an array");
   // checkMap("String comparison");
   // checkMap("Constants in ISO_FORTRAN_ENV");

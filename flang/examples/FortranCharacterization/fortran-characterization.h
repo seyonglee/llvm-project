@@ -140,6 +140,7 @@ public:
   //   (Command line processing)
   // - Long integers (Fortran 2008)
   // - Storage size (Fortran 2008)
+  // - Optional back argument added to maxloc and minloc (Fortran 2008)
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
