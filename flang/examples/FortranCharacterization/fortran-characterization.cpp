@@ -638,6 +638,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
           }
         }
       }
+    } else if (fnName == "storage_size") {
+      features["Storage size"] = true;
     } else {
       for (const auto &p : Fortran2003_interop_c_procedures) {
         if (fnName == p) {
@@ -906,7 +908,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Shifting bits");
   // checkMap("Merging bits");
   // checkMap("Bit transformational functions");
-  // checkMap("Storage size");
+  checkMap("Storage size");
   // checkMap("Optional argument radix added to selected real kind");
   // checkMap("Extensions to trigonometric and hyperbolic intrinsic
   // functions"); checkMap("Bessel functions"); checkMap("Error and gamma
