@@ -63,6 +63,9 @@ public:
 
   static std::vector<std::string> Fortran_intrinsic_modules;
 
+  static bool use_iso_Fortran_env;
+
+  void Post(const parser::Name &);
   ///////////////////////////////
   // Fortran 95's New Features //
   ///////////////////////////////
@@ -158,6 +161,8 @@ public:
   /////////////////////////////////
   // Fortran 2008's New Features //
   /////////////////////////////////
+  static std::vector<std::string> Fortran2008_iso_Fortran_env_constant_arrays;
+  static std::vector<std::string> Fortran2008_iso_Fortran_env_constant_scalars;
   // - Submodules
   void Post(const parser::SubmoduleStmt &);
   // - Coarrays

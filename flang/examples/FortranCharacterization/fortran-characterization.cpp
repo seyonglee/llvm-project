@@ -5,6 +5,8 @@
 #include "fortran-characterization.h"
 #include "flang/Common/indirection.h"
 #include "flang/Parser/parse-tree.h"
+#include <iostream>
+#include <vector>
 
 // Convert inputString to lowercases and store in a variable lName
 #define CONVERT2LOWERCASE(inputString, lName) \
@@ -123,6 +125,24 @@ std::vector<std::string> FeatureCharacterization::Fortran_intrinsic_modules{
     "iso_c_binding", "iso_varying_string", "ieee_control_type",
     "ieee_status_type"};
 
+bool FeatureCharacterization::use_iso_Fortran_env = false;
+
+void FeatureCharacterization::Post(const parser::Name &name) {
+  if (use_iso_Fortran_env) {
+    CONVERT2LOWERCASE(name.ToString(), nameString);
+    if (nameString.compare("iostat_inquire_internal_unit") == 0) {
+      features["Constants in ISO_FORTRAN_ENV"] = true;
+    } else {
+      for (const auto &constName :
+          Fortran2008_iso_Fortran_env_constant_arrays) {
+        if (nameString.compare(constName) == 0) {
+          features["Constants in ISO_FORTRAN_ENV"] = true;
+          break;
+        }
+      }
+    }
+  }
+}
 ///////////////////////////////
 // Fortran 95's New Features //
 ///////////////////////////////
@@ -271,8 +291,38 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
                   features["Interoperability of variables"] = true;
                 }
               }
+              auto it2 = std::find(
+                  Fortran2008_iso_Fortran_env_constant_scalars.begin(),
+                  Fortran2008_iso_Fortran_env_constant_scalars.end(), tnString);
+              if (it2 != Fortran2008_iso_Fortran_env_constant_scalars.end()) {
+                if (use_iso_Fortran_env) {
+                  features["Constants in ISO_FORTRAN_ENV"] = true;
+                }
+              }
+            } else if (const auto *const ae{
+                           std::get_if<Indirection<ArrayElement>>(&dref->u)}) {
+              if (const auto *const aname{
+                      std::get_if<Name>(&ae->value().base.u)}) {
+                CONVERT2LOWERCASE(aname->ToString(), anString);
+                auto it2 = std::find(
+                    Fortran2008_iso_Fortran_env_constant_arrays.begin(),
+                    Fortran2008_iso_Fortran_env_constant_arrays.end(),
+                    anString);
+                if (it2 != Fortran2008_iso_Fortran_env_constant_arrays.end()) {
+                  if (use_iso_Fortran_env) {
+                    features["Constants in ISO_FORTRAN_ENV"] = true;
+                  }
+                }
+              }
             }
           }
+        } else if (const auto *const fr{
+                       std::get_if<Indirection<FunctionReference>>(
+                           &kindExp.u)}) {
+          // FIXME: Parser incorrectly creates FunctionReference instead of
+          // ArrayElement. To fix this, semantic analysis should
+          // convert FunctionReference to ArrayElement.
+          // Temporarily, this check is handled by Post(const parser::Name &).
         }
       }
     };
@@ -351,6 +401,16 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
                   features["Interoperability of intrinsic types"] = true;
                   if (!is_poa) {
                     features["Interoperability of variables"] = true;
+                  }
+                }
+              } else if (const auto *const ae{
+                             std::get_if<common::Indirection<ArrayElement>>(
+                                 &dref->u)}) {
+                if (const auto *const aname{
+                        std::get_if<Name>(&ae->value().base.u)}) {
+                  CONVERT2LOWERCASE(aname->ToString(), anString);
+                  if (use_iso_Fortran_env && (anString == "character_kinds")) {
+                    features["Constants in ISO_FORTRAN_ENV"] = true;
                   }
                 }
               }
@@ -563,8 +623,11 @@ void FeatureCharacterization::Post(const parser::UseStmt &us) {
       Fortran_intrinsic_modules.end(), modString);
   if (it != Fortran_intrinsic_modules.end()) {
     if (us.nature.value_or(parser::UseStmt::ModuleNature::Non_Intrinsic) !=
-        parser::UseStmt::ModuleNature::Intrinsic) {
+        parser::UseStmt::ModuleNature::Non_Intrinsic) {
       features["Intrinsic modules"] = true;
+      if (modString == "iso_fortran_env") {
+        use_iso_Fortran_env = true;
+      }
     }
   }
   if (const auto *const renameList{std::get_if<std::list<Rename>>(&us.u)}) {
@@ -750,6 +813,13 @@ void FeatureCharacterization::Post(const parser::BindStmt &) {
 /////////////////////////////////
 // Fortran 2008's New Features //
 /////////////////////////////////
+std::vector<std::string>
+    FeatureCharacterization::Fortran2008_iso_Fortran_env_constant_arrays{
+        "character_kinds", "integer_kinds", "real_kinds", "logical_kinds"};
+std::vector<std::string>
+    FeatureCharacterization::Fortran2008_iso_Fortran_env_constant_scalars{
+        "int8", "int16", "int32", "int64", "real32", "real64", "real128",
+        "iostat_inquire_internal_unit"};
 void FeatureCharacterization::Post(const parser::SubmoduleStmt &) {
   features["Submodules"] = true;
 }
@@ -790,6 +860,7 @@ void FeatureCharacterization::Post(const parser::BlockStmt &) {
 /////////////////////////////////
 // Fortran 2018's New Features //
 /////////////////////////////////
+
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
   out_ << "\t\"" << key << "\": ";
@@ -929,7 +1000,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Optional back argument added to maxloc and minloc");
   // checkMap("Find location in an array");
   // checkMap("String comparison");
-  // checkMap("Constants in ISO_FORTRAN_ENV");
+  checkMap("Constants in ISO_FORTRAN_ENV");
   // checkMap("Compiler information in ISO_FORTRAN_ENV");
   // checkMap("Function for C sizeof");
   // checkMap("Optional argument for ieee_selected_real_kind");
