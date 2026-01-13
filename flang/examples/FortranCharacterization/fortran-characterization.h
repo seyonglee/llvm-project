@@ -65,6 +65,7 @@ public:
 
   static bool use_iso_Fortran_env;
 
+  // - Constants in ISO_FORTRAN_ENV (Fortran 2008)
   void Post(const parser::Name &);
   ///////////////////////////////
   // Fortran 95's New Features //
@@ -82,10 +83,6 @@ public:
   // - Pure procedures
   // - Elemental procedures
   void Post(const parser::PrefixSpec &);
-  // - Initialization of pointers with NULL function
-  // - New and enhanced intrinsic procedures
-  //   TODO: handle SIGN() function.
-  // void Post(const parser::Call &cs);
 
   /////////////////////////////////
   // Fortran 2003's New Features //
@@ -144,6 +141,11 @@ public:
   // - Long integers (Fortran 2008)
   // - Storage size (Fortran 2008)
   // - Optional back argument added to maxloc and minloc (Fortran 2008)
+  // - Initialization of pointers with NULL function
+  // - New and enhanced intrinsic procedures
+  //   TODO: handle SIGN() function.
+  // - Compiler information in ISO_FORTRAN_ENV (Fortran 2008)
+  // - Function for C sizeof (Fortran 2008)
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);

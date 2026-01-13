@@ -715,6 +715,11 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       }
     } else if (fnName == "storage_size") {
       features["Storage size"] = true;
+    } else if ((fnName == "compiler_options") ||
+        (fnName == "compiler_version")) {
+      features["Compiler information in ISO_FORTRAN_ENV"] = true;
+    } else if (fnName == "c_sizeof") {
+      features["Function for C sizeof"] = true;
     } else {
       for (const auto &p : Fortran2003_interop_c_procedures) {
         if (fnName == p) {
@@ -1001,8 +1006,8 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Find location in an array");
   // checkMap("String comparison");
   checkMap("Constants in ISO_FORTRAN_ENV");
-  // checkMap("Compiler information in ISO_FORTRAN_ENV");
-  // checkMap("Function for C sizeof");
+  checkMap("Compiler information in ISO_FORTRAN_ENV");
+  checkMap("Function for C sizeof");
   // checkMap("Optional argument for ieee_selected_real_kind");
   // checkMap("Save attribute for module and submodule data");
   // checkMap("Empty contains part");
