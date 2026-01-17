@@ -82,6 +82,7 @@ public:
   void Post(const parser::ComponentDecl &);
   // - Pure procedures
   // - Elemental procedures
+  // - Impure elemental procedures
   void Post(const parser::PrefixSpec &);
 
   /////////////////////////////////

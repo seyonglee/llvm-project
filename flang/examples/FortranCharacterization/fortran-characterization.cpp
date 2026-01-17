@@ -188,6 +188,8 @@ void FeatureCharacterization::Post(const parser::PrefixSpec &pSpec) {
     features["Pure procedures"] = true;
   } else if (std::get_if<parser::PrefixSpec::Elemental>(&pSpec.u)) {
     features["Elemental procedures"] = true;
+  } else if (std::get_if<parser::PrefixSpec::Impure>(&pSpec.u)) {
+    features["Impure elemental procedures"] = true;
   }
 }
 
@@ -1017,7 +1019,7 @@ void FeatureCharacterization::checkAllFeatures() {
   //    "Null pointer or unallocated allocatable as an absent dummy
   //    argument");
   // checkMap("Non-pointer actual for pointer dummy argument");
-  // checkMap("Impure elemental procedures");
+  checkMap("Impure elemental procedures");
   // checkMap("Generic resolution by procedureness");
   // checkMap("Generic resolution by pointer vs. allocatable");
   out_ << "}\n";
