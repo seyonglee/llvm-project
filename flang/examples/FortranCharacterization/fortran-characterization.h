@@ -65,6 +65,8 @@ public:
 
   static bool use_iso_Fortran_env;
 
+  static bool is_in_c_binding_procedure;
+
   // - Constants in ISO_FORTRAN_ENV (Fortran 2008)
   void Post(const parser::Name &);
   ///////////////////////////////
@@ -110,6 +112,9 @@ public:
   // - Interoperability of intrinsic types
   // - Interoperability with C pointers
   // - Interoperability of variables
+  // - C descriptors (Fortran 2018)
+  // - Attribute codes (Fortran 2018)
+  // - The type CFI_dim_t (Fortran 2018)
   void checkDeclarationTypeSpec(const parser::DeclarationTypeSpec &, bool);
   void Post(const parser::DeclarationTypeSpec &);
   // - SELECT TYPE construct
@@ -120,6 +125,9 @@ public:
   // - Allocatable character length
   // - Interoperability of global data
   // - Pointer initialization with SAVE attribute (Fortran 2008)
+  // - C descriptors (Fortran 2018)
+  // - Attribute codes (Fortran 2018)
+  // - The type CFI_dim_t (Fortran 2018)
   void Post(const parser::TypeDeclarationStmt &);
   // - Allocatable scalars
   // - Allocatable character length
@@ -158,6 +166,9 @@ public:
   void Post(const parser::ProcAttrSpec &);
   void Post(const parser::Suffix &);
   void Post(const parser::SubroutineStmt &);
+  void Post(const parser::EndSubroutineStmt &);
+  void Post(const parser::FunctionStmt &);
+  void Post(const parser::EndFunctionStmt &);
   // - Interoperability of global data
   void Post(const parser::BindStmt &);
 

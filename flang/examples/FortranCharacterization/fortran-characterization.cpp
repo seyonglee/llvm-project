@@ -6,6 +6,7 @@
 #include "flang/Common/indirection.h"
 #include "flang/Parser/parse-tree.h"
 #include <iostream>
+#include <variant>
 #include <vector>
 
 // Convert inputString to lowercases and store in a variable lName
@@ -116,7 +117,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Generic resolution by procedureness", false},
     {"Generic resolution by pointer vs. allocatable", false},
     /* Fortran 2018's New Features */
-    {"C descriptors", false}
+    {"C descriptors", false}, {"Attribute codes", false},
+    {"The type CFI_dim_t", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -126,6 +128,8 @@ std::vector<std::string> FeatureCharacterization::Fortran_intrinsic_modules{
     "ieee_status_type"};
 
 bool FeatureCharacterization::use_iso_Fortran_env = false;
+
+bool FeatureCharacterization::is_in_c_binding_procedure = false;
 
 void FeatureCharacterization::Post(const parser::Name &name) {
   if (use_iso_Fortran_env) {
@@ -376,6 +380,13 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
                   }
                 }
               }
+            } else if (const auto *const str{
+                           std::get_if<parser::Star>(&tpv->u)}) {
+              if (is_in_c_binding_procedure) {
+                features["C descriptors"] = true;
+                features["Attribute codes"] = true;
+                features["The type CFI_dim_t"] = true;
+              }
             }
           }
         } else if (const auto *const lk{
@@ -390,6 +401,13 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
                 if (const auto *const ilc{
                         std::get_if<parser::IntLiteralConstant>(&lc->u)}) {
                 }
+              }
+            } else if (const auto *const str{
+                           std::get_if<parser::Star>(&lk->length.value().u)}) {
+              if (is_in_c_binding_procedure) {
+                features["C descriptors"] = true;
+                features["Attribute codes"] = true;
+                features["The type CFI_dim_t"] = true;
               }
             }
           }
@@ -454,12 +472,37 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   for (const parser::AttrSpec &attrSpec : attrSpecList) {
     if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
       allocatableAttr = true;
+      if (is_in_c_binding_procedure) {
+        features["C descriptors"] = true;
+        features["Attribute codes"] = true;
+        features["The type CFI_dim_t"] = true;
+      }
     }
     if (std::holds_alternative<parser::Pointer>(attrSpec.u)) {
       pointerAttr = true;
+      if (is_in_c_binding_procedure) {
+        features["C descriptors"] = true;
+        features["Attribute codes"] = true;
+        features["The type CFI_dim_t"] = true;
+      }
     }
     if (std::holds_alternative<parser::ArraySpec>(attrSpec.u)) {
       arraySpecAttr = true;
+      auto const *arraySpec = std::get_if<parser::ArraySpec>(&attrSpec.u);
+      if (std::holds_alternative<std::list<AssumedShapeSpec>>(arraySpec->u)) {
+        if (is_in_c_binding_procedure) {
+          features["C descriptors"] = true;
+          features["Attribute codes"] = true;
+          features["The type CFI_dim_t"] = true;
+        }
+      } else if (std::holds_alternative<parser::DeferredShapeSpecList>(
+                     arraySpec->u)) {
+        if (is_in_c_binding_procedure) {
+          features["C descriptors"] = true;
+          features["Attribute codes"] = true;
+          features["The type CFI_dim_t"] = true;
+        }
+      }
     }
     if (std::holds_alternative<parser::CoarraySpec>(attrSpec.u)) {
       coarraySpecAttr = true;
@@ -478,6 +521,24 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
     features["Pointer initialization with SAVE attribute"] = true;
   }
   checkDeclarationTypeSpec(dts, pointerAttr || allocatableAttr);
+  if (is_in_c_binding_procedure) {
+    for (const parser::EntityDecl &ed : entityDeclList) {
+      if (std::get<std::optional<parser::ArraySpec>>(ed.t).has_value()) {
+        auto const &arraySpec{
+            std::get<std::optional<parser::ArraySpec>>(ed.t).value()};
+        if (std::holds_alternative<std::list<AssumedShapeSpec>>(arraySpec.u)) {
+          features["C descriptors"] = true;
+          features["Attribute codes"] = true;
+          features["The type CFI_dim_t"] = true;
+        } else if (std::holds_alternative<parser::DeferredShapeSpecList>(
+                       arraySpec.u)) {
+          features["C descriptors"] = true;
+          features["Attribute codes"] = true;
+          features["The type CFI_dim_t"] = true;
+        }
+      }
+    }
+  }
   if (allocatableAttr) {
     // if there is an arrayspec, it's not a scalar
     if (arraySpecAttr || coarraySpecAttr) {
@@ -811,7 +872,25 @@ void FeatureCharacterization::Post(const parser::SubroutineStmt &sts) {
   const auto &lbinding{std::get<std::optional<LanguageBindingSpec>>(sts.t)};
   if (lbinding.has_value()) {
     features["Interoperability of procedures"] = true;
+    is_in_c_binding_procedure = true;
+  } else {
+    is_in_c_binding_procedure = false;
   }
+}
+void FeatureCharacterization::Post(const parser::EndSubroutineStmt &ests) {
+  is_in_c_binding_procedure = false;
+}
+void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
+  const auto &sufx{std::get<std::optional<Suffix>>(fts.t)};
+  if (sufx.has_value() && sufx.value().binding.has_value()) {
+    features["Interoperability of procedures"] = true;
+    is_in_c_binding_procedure = true;
+  } else {
+    is_in_c_binding_procedure = false;
+  }
+}
+void FeatureCharacterization::Post(const parser::EndFunctionStmt &efts) {
+  is_in_c_binding_procedure = false;
 }
 void FeatureCharacterization::Post(const parser::BindStmt &) {
   features["Interoperability of global data"] = true;
@@ -1025,6 +1104,8 @@ void FeatureCharacterization::checkAllFeatures() {
   out_ << "}\n";
 
   out_ << "Fortran 2018's New Features {\n";
-  // checkMap("C descriptors");
+  checkMap("C descriptors");
+  checkMap("Attribute codes");
+  checkMap("The type CFI_dim_t");
   out_ << "}\n";
 }
