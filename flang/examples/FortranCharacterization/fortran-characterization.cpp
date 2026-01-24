@@ -119,7 +119,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     /* Fortran 2018's New Features */
     {"C descriptors", false}, {"Attribute codes", false},
     {"The type CFI_dim_t", false}, {"Assumed rank", false},
-    {"SELECT RANK", false}, {"Assumed-size arrays", false}
+    {"SELECT RANK", false}, {"Assumed-size arrays", false},
+    {"Assumed type", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -271,6 +272,8 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
     features["Polymorphic entities"] = true;
   } else if (std::get_if<parser::DeclarationTypeSpec::ClassStar>(&dts.u)) {
     features["Polymorphic entities"] = true;
+  } else if (std::get_if<parser::DeclarationTypeSpec::TypeStar>(&dts.u)) {
+    features["Assumed type"] = true;
   } else if (const auto *const typeT{
                  std::get_if<parser::DeclarationTypeSpec::Type>(&dts.u)}) {
     const auto &tname{std::get<Name>(typeT->derived.t)};
@@ -1131,5 +1134,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Assumed rank");
   checkMap("SELECT RANK");
   checkMap("Assumed-size arrays");
+  checkMap("Assumed type");
   out_ << "}\n";
 }

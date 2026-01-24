@@ -115,6 +115,7 @@ public:
   // - C descriptors (Fortran 2018)
   // - Attribute codes (Fortran 2018)
   // - The type CFI_dim_t (Fortran 2018)
+  // - Assumed type (Fortran 2018)
   void checkDeclarationTypeSpec(const parser::DeclarationTypeSpec &, bool);
   void Post(const parser::DeclarationTypeSpec &);
   // - SELECT TYPE construct
