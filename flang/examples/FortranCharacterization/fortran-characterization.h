@@ -128,6 +128,7 @@ public:
   // - C descriptors (Fortran 2018)
   // - Attribute codes (Fortran 2018)
   // - The type CFI_dim_t (Fortran 2018)
+  // - Assumed rank (Fortran 2018)
   void Post(const parser::TypeDeclarationStmt &);
   // - Allocatable scalars
   // - Allocatable character length
@@ -155,6 +156,7 @@ public:
   //   TODO: handle SIGN() function.
   // - Compiler information in ISO_FORTRAN_ENV (Fortran 2008)
   // - Function for C sizeof (Fortran 2008)
+  // - Assumed rank (Fortran 2018)
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
@@ -202,6 +204,11 @@ public:
   void Post(const parser::ConnectSpec::Newunit &);
   // - The BLOCK construct
   void Post(const parser::BlockStmt &);
+
+  /////////////////////////////////
+  // Fortran 2008's New Features //
+  /////////////////////////////////
+  void Post(const parser::SelectRankStmt &);
 
 protected:
 private:

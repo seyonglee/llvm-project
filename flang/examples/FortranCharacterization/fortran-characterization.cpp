@@ -118,7 +118,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Generic resolution by pointer vs. allocatable", false},
     /* Fortran 2018's New Features */
     {"C descriptors", false}, {"Attribute codes", false},
-    {"The type CFI_dim_t", false}
+    {"The type CFI_dim_t", false}, {"Assumed rank", false},
+    {"SELECT RANK", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -502,6 +503,9 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
           features["Attribute codes"] = true;
           features["The type CFI_dim_t"] = true;
         }
+      } else if (std::holds_alternative<parser::AssumedRankSpec>(
+                     arraySpec->u)) {
+        features["Assumed rank"] = true;
       }
     }
     if (std::holds_alternative<parser::CoarraySpec>(attrSpec.u)) {
@@ -521,11 +525,11 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
     features["Pointer initialization with SAVE attribute"] = true;
   }
   checkDeclarationTypeSpec(dts, pointerAttr || allocatableAttr);
-  if (is_in_c_binding_procedure) {
-    for (const parser::EntityDecl &ed : entityDeclList) {
-      if (std::get<std::optional<parser::ArraySpec>>(ed.t).has_value()) {
-        auto const &arraySpec{
-            std::get<std::optional<parser::ArraySpec>>(ed.t).value()};
+  for (const parser::EntityDecl &ed : entityDeclList) {
+    if (std::get<std::optional<parser::ArraySpec>>(ed.t).has_value()) {
+      auto const &arraySpec{
+          std::get<std::optional<parser::ArraySpec>>(ed.t).value()};
+      if (is_in_c_binding_procedure) {
         if (std::holds_alternative<std::list<AssumedShapeSpec>>(arraySpec.u)) {
           features["C descriptors"] = true;
           features["Attribute codes"] = true;
@@ -536,6 +540,9 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
           features["Attribute codes"] = true;
           features["The type CFI_dim_t"] = true;
         }
+      }
+      if (std::holds_alternative<parser::AssumedRankSpec>(arraySpec.u)) {
+        features["Assumed rank"] = true;
       }
     }
   }
@@ -783,6 +790,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       features["Compiler information in ISO_FORTRAN_ENV"] = true;
     } else if (fnName == "c_sizeof") {
       features["Function for C sizeof"] = true;
+    } else if (fnName == "rank") {
+      features["Assumed rank"] = true;
     } else {
       for (const auto &p : Fortran2003_interop_c_procedures) {
         if (fnName == p) {
@@ -946,6 +955,9 @@ void FeatureCharacterization::Post(const parser::BlockStmt &) {
 /////////////////////////////////
 // Fortran 2018's New Features //
 /////////////////////////////////
+void FeatureCharacterization::Post(const parser::SelectRankStmt &) {
+  features["SELECT RANK"] = true;
+}
 
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
@@ -1107,5 +1119,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("C descriptors");
   checkMap("Attribute codes");
   checkMap("The type CFI_dim_t");
+  checkMap("Assumed rank");
+  checkMap("SELECT RANK");
   out_ << "}\n";
 }
