@@ -119,7 +119,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     /* Fortran 2018's New Features */
     {"C descriptors", false}, {"Attribute codes", false},
     {"The type CFI_dim_t", false}, {"Assumed rank", false},
-    {"SELECT RANK", false}
+    {"SELECT RANK", false}, {"Assumed-size arrays", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -958,6 +958,15 @@ void FeatureCharacterization::Post(const parser::BlockStmt &) {
 void FeatureCharacterization::Post(const parser::SelectRankStmt &) {
   features["SELECT RANK"] = true;
 }
+void FeatureCharacterization::Post(const parser::AssumedSizeSpec &) {
+  features["Assumed-size arrays"] = true;
+}
+void FeatureCharacterization::Post(const parser::ImpliedShapeSpec &iss) {
+  auto &assumedImpliedShapeSpecs = iss.v;
+  if (assumedImpliedShapeSpecs.size() == 1) {
+    features["Assumed-size arrays"] = true;
+  }
+}
 
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
@@ -1121,5 +1130,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("The type CFI_dim_t");
   checkMap("Assumed rank");
   checkMap("SELECT RANK");
+  checkMap("Assumed-size arrays");
   out_ << "}\n";
 }

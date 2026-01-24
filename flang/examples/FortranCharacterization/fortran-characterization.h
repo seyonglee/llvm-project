@@ -206,9 +206,14 @@ public:
   void Post(const parser::BlockStmt &);
 
   /////////////////////////////////
-  // Fortran 2008's New Features //
+  // Fortran 2018's New Features //
   /////////////////////////////////
+  // - SELECT RANK
   void Post(const parser::SelectRankStmt &);
+  // - Assumed-size arrays
+  void Post(const parser::AssumedSizeSpec &);
+  // - Assumed-size arrays
+  void Post(const parser::ImpliedShapeSpec &);
 
 protected:
 private:
