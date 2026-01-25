@@ -120,7 +120,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"C descriptors", false}, {"Attribute codes", false},
     {"The type CFI_dim_t", false}, {"Assumed rank", false},
     {"SELECT RANK", false}, {"Assumed-size arrays", false},
-    {"Assumed type", false}
+    {"Assumed type", false},
+    {"Contiguous attribute for assumed-rank arrays", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -473,6 +474,8 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   bool coarraySpecAttr{false};
   bool saveAttr{false};
   bool targetAttr{false};
+  bool contiguousAttr{false};
+  bool assumedRankAttr{false};
   for (const parser::AttrSpec &attrSpec : attrSpecList) {
     if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
       allocatableAttr = true;
@@ -509,6 +512,10 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
       } else if (std::holds_alternative<parser::AssumedRankSpec>(
                      arraySpec->u)) {
         features["Assumed rank"] = true;
+        assumedRankAttr = true;
+        if (contiguousAttr) {
+          features["Contiguous attribute for assumed-rank arrays"] = true;
+        }
       }
     }
     if (std::holds_alternative<parser::CoarraySpec>(attrSpec.u)) {
@@ -522,6 +529,12 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
     }
     if (std::holds_alternative<parser::Target>(attrSpec.u)) {
       targetAttr = true;
+    }
+    if (std::holds_alternative<parser::Contiguous>(attrSpec.u)) {
+      contiguousAttr = true;
+      if (assumedRankAttr) {
+        features["Contiguous attribute for assumed-rank arrays"] = true;
+      }
     }
   }
   if (saveAttr && targetAttr) {
@@ -546,6 +559,9 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
       }
       if (std::holds_alternative<parser::AssumedRankSpec>(arraySpec.u)) {
         features["Assumed rank"] = true;
+        if (contiguousAttr) {
+          features["Contiguous attribute for assumed-rank arrays"] = true;
+        }
       }
     }
   }
@@ -1135,5 +1151,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("SELECT RANK");
   checkMap("Assumed-size arrays");
   checkMap("Assumed type");
+  checkMap("Contiguous attribute for assumed-rank arrays");
   out_ << "}\n";
 }

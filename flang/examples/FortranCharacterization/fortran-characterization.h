@@ -130,6 +130,7 @@ public:
   // - Attribute codes (Fortran 2018)
   // - The type CFI_dim_t (Fortran 2018)
   // - Assumed rank (Fortran 2018)
+  // - Contiguous attribute for assumed-rank arrays (Fortran 2018)
   void Post(const parser::TypeDeclarationStmt &);
   // - Allocatable scalars
   // - Allocatable character length
