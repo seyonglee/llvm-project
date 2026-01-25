@@ -121,7 +121,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"The type CFI_dim_t", false}, {"Assumed rank", false},
     {"SELECT RANK", false}, {"Assumed-size arrays", false},
     {"Assumed type", false},
-    {"Contiguous attribute for assumed-rank arrays", false}
+    {"Contiguous attribute for assumed-rank arrays", false},
+    {"Implicit none enhancement", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -986,6 +987,18 @@ void FeatureCharacterization::Post(const parser::ImpliedShapeSpec &iss) {
     features["Assumed-size arrays"] = true;
   }
 }
+void FeatureCharacterization::Post(const parser::ImplicitStmt &is) {
+  if (const auto *const inns{
+          std::get_if<std::list<ImplicitStmt::ImplicitNoneNameSpec>>(&is.u)}) {
+    if (!inns->empty()) {
+      features["Implicit none enhancement"] = true;
+    }
+  }
+}
+
+///////////////////////
+// Utility Functions //
+///////////////////////
 
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
@@ -1152,5 +1165,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Assumed-size arrays");
   checkMap("Assumed type");
   checkMap("Contiguous attribute for assumed-rank arrays");
+  checkMap("Implicit none enhancement");
   out_ << "}\n";
 }

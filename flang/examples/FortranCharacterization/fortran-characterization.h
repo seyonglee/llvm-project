@@ -216,6 +216,8 @@ public:
   void Post(const parser::AssumedSizeSpec &);
   // - Assumed-size arrays
   void Post(const parser::ImpliedShapeSpec &);
+  // - Implicit none enhancement
+  void Post(const parser::ImplicitStmt &);
 
 protected:
 private:
