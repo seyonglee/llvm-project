@@ -122,7 +122,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"SELECT RANK", false}, {"Assumed-size arrays", false},
     {"Assumed type", false},
     {"Contiguous attribute for assumed-rank arrays", false},
-    {"Implicit none enhancement", false}
+    {"Implicit none enhancement", false},
+    {"Kind of the do variable in implied do", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -995,6 +996,18 @@ void FeatureCharacterization::Post(const parser::ImplicitStmt &is) {
     }
   }
 }
+void FeatureCharacterization::Post(const parser::AcImpliedDoControl &aic) {
+  const auto &its{std::get<std::optional<IntegerTypeSpec>>(aic.t)};
+  if (its.has_value()) {
+    features["Kind of the do variable in implied do"] = true;
+  }
+}
+void FeatureCharacterization::Post(const parser::DataImpliedDo &did) {
+  const auto &its{std::get<std::optional<IntegerTypeSpec>>(did.t)};
+  if (its.has_value()) {
+    features["Kind of the do variable in implied do"] = true;
+  }
+}
 
 ///////////////////////
 // Utility Functions //
@@ -1166,5 +1179,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Assumed type");
   checkMap("Contiguous attribute for assumed-rank arrays");
   checkMap("Implicit none enhancement");
+  checkMap("Kind of the do variable in implied do");
   out_ << "}\n";
 }

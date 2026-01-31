@@ -218,6 +218,10 @@ public:
   void Post(const parser::ImpliedShapeSpec &);
   // - Implicit none enhancement
   void Post(const parser::ImplicitStmt &);
+  // - Kind of the do variable in implied do
+  void Post(const parser::AcImpliedDoControl &);
+  // - Kind of the do variable in implied do
+  void Post(const parser::DataImpliedDo &);
 
 protected:
 private:
