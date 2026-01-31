@@ -147,6 +147,7 @@ public:
   // - Pointer assignment (rank remapping)
   void Post(const parser::PointerAssignmentStmt &us);
   // - import statement
+  // - Control of host association
   void Post(const parser::ImportStmt &is);
   // - Access to the computing environment
   //   (Command line processing)

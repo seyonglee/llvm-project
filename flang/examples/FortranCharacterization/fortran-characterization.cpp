@@ -124,7 +124,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Contiguous attribute for assumed-rank arrays", false},
     {"Implicit none enhancement", false},
     {"Kind of the do variable in implied do", false},
-    {"Locality clauses in do concurrent", false}
+    {"Locality clauses in do concurrent", false},
+    {"Control of host association", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -746,6 +747,9 @@ void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
 }
 void FeatureCharacterization::Post(const parser::ImportStmt &is) {
   features["The IMPORT statement"] = true;
+  if (is.kind != common::ImportKind::Default) {
+    features["Control of host association"] = true;
+  }
 }
 // R1520 function-reference -> procedure-designator ( [actual-arg-spec-list] )
 // R1521 call-stmt -> CALL procedure-designator [( [actual-arg-spec-list] )]
@@ -1185,5 +1189,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Implicit none enhancement");
   checkMap("Kind of the do variable in implied do");
   checkMap("Locality clauses in do concurrent");
+  checkMap("Control of host association");
   out_ << "}\n";
 }
