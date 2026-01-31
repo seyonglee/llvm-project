@@ -222,6 +222,8 @@ public:
   void Post(const parser::AcImpliedDoControl &);
   // - Kind of the do variable in implied do
   void Post(const parser::DataImpliedDo &);
+  // - Locality clauses in do concurrent
+  void Post(const parser::LocalitySpec &);
 
 protected:
 private:

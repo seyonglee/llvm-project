@@ -123,7 +123,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Assumed type", false},
     {"Contiguous attribute for assumed-rank arrays", false},
     {"Implicit none enhancement", false},
-    {"Kind of the do variable in implied do", false}
+    {"Kind of the do variable in implied do", false},
+    {"Locality clauses in do concurrent", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -1008,6 +1009,9 @@ void FeatureCharacterization::Post(const parser::DataImpliedDo &did) {
     features["Kind of the do variable in implied do"] = true;
   }
 }
+void FeatureCharacterization::Post(const parser::LocalitySpec &ls) {
+  features["Locality clauses in do concurrent"] = true;
+}
 
 ///////////////////////
 // Utility Functions //
@@ -1180,5 +1184,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Contiguous attribute for assumed-rank arrays");
   checkMap("Implicit none enhancement");
   checkMap("Kind of the do variable in implied do");
+  checkMap("Locality clauses in do concurrent");
   out_ << "}\n";
 }
