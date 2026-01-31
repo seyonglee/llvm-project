@@ -125,7 +125,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Implicit none enhancement", false},
     {"Kind of the do variable in implied do", false},
     {"Locality clauses in do concurrent", false},
-    {"Control of host association", false}
+    {"Control of host association", false},
+    {"Simplification of calls of the intrinsic cmplx", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -818,6 +819,21 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       features["Function for C sizeof"] = true;
     } else if (fnName == "rank") {
       features["Assumed rank"] = true;
+    } else if (fnName == "cmplx") {
+      bool found_kind = false;
+      for (const auto &arg : actArgSpecs) {
+        const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+        if (optKeyword.has_value()) {
+          CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
+          if (kw == "kind") {
+            found_kind = true;
+            break;
+          }
+        }
+      }
+      if (!found_kind) {
+        features["Simplification of calls of the intrinsic cmplx"] = true;
+      }
     } else {
       for (const auto &p : Fortran2003_interop_c_procedures) {
         if (fnName == p) {
@@ -1190,5 +1206,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Kind of the do variable in implied do");
   checkMap("Locality clauses in do concurrent");
   checkMap("Control of host association");
+  checkMap("Simplification of calls of the intrinsic cmplx");
   out_ << "}\n";
 }

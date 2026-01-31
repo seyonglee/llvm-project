@@ -160,6 +160,7 @@ public:
   // - Compiler information in ISO_FORTRAN_ENV (Fortran 2008)
   // - Function for C sizeof (Fortran 2008)
   // - Assumed rank (Fortran 2018)
+  // - Simplification of calls of the intrinsic cmplx (Fortran 2018)
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
