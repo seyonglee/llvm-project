@@ -67,6 +67,8 @@ public:
 
   static bool is_in_c_binding_procedure;
 
+  static bool is_in_pure_procedure;
+
   // - Constants in ISO_FORTRAN_ENV (Fortran 2008)
   void Post(const parser::Name &);
   ///////////////////////////////
@@ -226,6 +228,8 @@ public:
   void Post(const parser::DataImpliedDo &);
   // - Locality clauses in do concurrent
   void Post(const parser::LocalitySpec &);
+  // - Removal of anomalies regarding pure procedures
+  void Post(const parser::StopStmt &);
 
 protected:
 private:

@@ -126,7 +126,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Kind of the do variable in implied do", false},
     {"Locality clauses in do concurrent", false},
     {"Control of host association", false},
-    {"Simplification of calls of the intrinsic cmplx", false}
+    {"Simplification of calls of the intrinsic cmplx", false},
+    {"Removal of anomalies regarding pure procedures", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -138,6 +139,8 @@ std::vector<std::string> FeatureCharacterization::Fortran_intrinsic_modules{
 bool FeatureCharacterization::use_iso_Fortran_env = false;
 
 bool FeatureCharacterization::is_in_c_binding_procedure = false;
+
+bool FeatureCharacterization::is_in_pure_procedure = false;
 
 void FeatureCharacterization::Post(const parser::Name &name) {
   if (use_iso_Fortran_env) {
@@ -198,6 +201,7 @@ void FeatureCharacterization::Post(const parser::ComponentDecl &compDecl) {
 void FeatureCharacterization::Post(const parser::PrefixSpec &pSpec) {
   if (std::get_if<parser::PrefixSpec::Pure>(&pSpec.u)) {
     features["Pure procedures"] = true;
+    is_in_pure_procedure = true;
   } else if (std::get_if<parser::PrefixSpec::Elemental>(&pSpec.u)) {
     features["Elemental procedures"] = true;
   } else if (std::get_if<parser::PrefixSpec::Impure>(&pSpec.u)) {
@@ -930,6 +934,7 @@ void FeatureCharacterization::Post(const parser::SubroutineStmt &sts) {
 }
 void FeatureCharacterization::Post(const parser::EndSubroutineStmt &ests) {
   is_in_c_binding_procedure = false;
+  is_in_pure_procedure = false;
 }
 void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
   const auto &sufx{std::get<std::optional<Suffix>>(fts.t)};
@@ -942,6 +947,7 @@ void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
 }
 void FeatureCharacterization::Post(const parser::EndFunctionStmt &efts) {
   is_in_c_binding_procedure = false;
+  is_in_pure_procedure = false;
 }
 void FeatureCharacterization::Post(const parser::BindStmt &) {
   features["Interoperability of global data"] = true;
@@ -1031,6 +1037,14 @@ void FeatureCharacterization::Post(const parser::DataImpliedDo &did) {
 }
 void FeatureCharacterization::Post(const parser::LocalitySpec &ls) {
   features["Locality clauses in do concurrent"] = true;
+}
+void FeatureCharacterization::Post(const parser::StopStmt &ss) {
+  if (is_in_pure_procedure) {
+    const auto &kind{std::get<parser::StopStmt::Kind>(ss.t)};
+    if (kind == parser::StopStmt::Kind::ErrorStop) {
+      features["Removal of anomalies regarding pure procedures"] = true;
+    }
+  }
 }
 
 ///////////////////////
@@ -1207,5 +1221,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Locality clauses in do concurrent");
   checkMap("Control of host association");
   checkMap("Simplification of calls of the intrinsic cmplx");
+  checkMap("Removal of anomalies regarding pure procedures");
   out_ << "}\n";
 }
