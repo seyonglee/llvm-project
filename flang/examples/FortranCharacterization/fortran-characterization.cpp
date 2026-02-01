@@ -6,6 +6,7 @@
 #include "flang/Common/indirection.h"
 #include "flang/Parser/parse-tree.h"
 #include <iostream>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -122,6 +123,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"SELECT RANK", false}, {"Assumed-size arrays", false},
     {"Assumed type", false},
     {"Contiguous attribute for assumed-rank arrays", false},
+    {"Default accessibility for entities accessed from a module", false},
     {"Implicit none enhancement", false},
     {"Kind of the do variable in implied do", false},
     {"Locality clauses in do concurrent", false},
@@ -136,11 +138,15 @@ std::vector<std::string> FeatureCharacterization::Fortran_intrinsic_modules{
     "iso_c_binding", "iso_varying_string", "ieee_control_type",
     "ieee_status_type"};
 
+std::unordered_set<std::string> FeatureCharacterization::used_modules;
+
 bool FeatureCharacterization::use_iso_Fortran_env = false;
 
 bool FeatureCharacterization::is_in_c_binding_procedure = false;
 
 bool FeatureCharacterization::is_in_pure_procedure = false;
+
+bool FeatureCharacterization::is_in_module = false;
 
 void FeatureCharacterization::Post(const parser::Name &name) {
   if (use_iso_Fortran_env) {
@@ -740,6 +746,7 @@ void FeatureCharacterization::Post(const parser::UseStmt &us) {
       }
     }
   }
+  used_modules.insert(modString);
 }
 void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
   const auto &bounds{std::get<PointerAssignmentStmt::Bounds>(pas.t)};
@@ -1046,6 +1053,30 @@ void FeatureCharacterization::Post(const parser::StopStmt &ss) {
     }
   }
 }
+void FeatureCharacterization::Post(const parser::ModuleStmt &ls) {
+  is_in_module = true;
+}
+void FeatureCharacterization::Post(const parser::EndModuleStmt &ls) {
+  is_in_module = false;
+  used_modules.clear();
+}
+void FeatureCharacterization::Post(const parser::AccessStmt &as) {
+  if (is_in_module) {
+    const auto &accessIdList{std::get<std::list<parser::AccessId>>(as.t)};
+    for (const auto &accessId : accessIdList) {
+      const auto *aName{std::get_if<parser::Name>(&accessId.v.value().u)};
+      if (aName != nullptr) {
+        CONVERT2LOWERCASE(aName->ToString(), accessIdString);
+        if (used_modules.find(accessIdString) != used_modules.end()) {
+          features
+              ["Default accessibility for entities accessed from a module"] =
+                  true;
+          break;
+        }
+      }
+    }
+  }
+}
 
 ///////////////////////
 // Utility Functions //
@@ -1216,6 +1247,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Assumed-size arrays");
   checkMap("Assumed type");
   checkMap("Contiguous attribute for assumed-rank arrays");
+  checkMap("Default accessibility for entities accessed from a module");
   checkMap("Implicit none enhancement");
   checkMap("Kind of the do variable in implied do");
   checkMap("Locality clauses in do concurrent");

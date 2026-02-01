@@ -30,6 +30,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 
 using namespace Fortran::semantics;
 using namespace Fortran::common;
@@ -63,11 +64,15 @@ public:
 
   static std::vector<std::string> Fortran_intrinsic_modules;
 
+  static std::unordered_set<std::string> used_modules;
+
   static bool use_iso_Fortran_env;
 
   static bool is_in_c_binding_procedure;
 
   static bool is_in_pure_procedure;
+
+  static bool is_in_module;
 
   // - Constants in ISO_FORTRAN_ENV (Fortran 2008)
   void Post(const parser::Name &);
@@ -230,6 +235,12 @@ public:
   void Post(const parser::LocalitySpec &);
   // - Removal of anomalies regarding pure procedures
   void Post(const parser::StopStmt &);
+  // - Default accessibility for entities accessed from a module
+  void Post(const parser::ModuleStmt &);
+  // - Default accessibility for entities accessed from a module
+  void Post(const parser::EndModuleStmt &);
+  // - Default accessibility for entities accessed from a module
+  void Post(const parser::AccessStmt &);
 
 protected:
 private:
