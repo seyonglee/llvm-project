@@ -126,6 +126,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Default accessibility for entities accessed from a module", false},
     {"Implicit none enhancement", false},
     {"Changes to Intrinsics that access the computing environment", false},
+    {"New reduction intrinsic reduce", false},
     {"Kind of the do variable in implied do", false},
     {"Locality clauses in do concurrent", false},
     {"Control of host association", false},
@@ -845,6 +846,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       if (!found_kind) {
         features["Simplification of calls of the intrinsic cmplx"] = true;
       }
+    } else if (fnName == "reduce") {
+      features["New reduction intrinsic reduce"] = true;
     } else if (computing_environment_intrinsics.find(fnName) !=
         computing_environment_intrinsics.end()) {
       features
@@ -1266,6 +1269,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Default accessibility for entities accessed from a module");
   checkMap("Implicit none enhancement");
   checkMap("Changes to Intrinsics that access the computing environment");
+  checkMap("New reduction intrinsic reduce");
   checkMap("Kind of the do variable in implied do");
   checkMap("Locality clauses in do concurrent");
   checkMap("Control of host association");
