@@ -94,6 +94,7 @@ public:
   // - Pure procedures
   // - Elemental procedures
   // - Impure elemental procedures
+  // - Recursive and non-recursive procedures (Fortran 2018)
   void Post(const parser::PrefixSpec &);
 
   /////////////////////////////////

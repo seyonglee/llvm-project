@@ -133,7 +133,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Locality clauses in do concurrent", false},
     {"Control of host association", false},
     {"Simplification of calls of the intrinsic cmplx", false},
-    {"Removal of anomalies regarding pure procedures", false}
+    {"Removal of anomalies regarding pure procedures", false},
+    {"Recursive and non-recursive procedures", false}
     /* Add other Fortran 2018 Features */
 };
 
@@ -221,6 +222,8 @@ void FeatureCharacterization::Post(const parser::PrefixSpec &pSpec) {
     features["Elemental procedures"] = true;
   } else if (std::get_if<parser::PrefixSpec::Impure>(&pSpec.u)) {
     features["Impure elemental procedures"] = true;
+  } else if (std::get_if<parser::PrefixSpec::Non_Recursive>(&pSpec.u)) {
+    features["Recursive and non-recursive procedures"] = true;
   }
 }
 
@@ -1283,5 +1286,6 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Control of host association");
   checkMap("Simplification of calls of the intrinsic cmplx");
   checkMap("Removal of anomalies regarding pure procedures");
+  checkMap("Recursive and non-recursive procedures");
   out_ << "}\n";
 }
