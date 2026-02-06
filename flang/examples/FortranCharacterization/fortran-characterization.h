@@ -173,6 +173,8 @@ public:
   // - Changes to Intrinsics that access the computing environment (Fortran
   // 2018)
   // - New reduction intrinsic reduce (Fortran 2018)
+  // - Intrinsic function coshape (Fortran 2018)
+  // - Intrinsic subroutine random_init (Fortran 2018)
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);

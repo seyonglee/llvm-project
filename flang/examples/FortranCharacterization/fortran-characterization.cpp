@@ -127,6 +127,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Implicit none enhancement", false},
     {"Changes to Intrinsics that access the computing environment", false},
     {"New reduction intrinsic reduce", false},
+    {"Intrinsic function coshape", false},
+    {"Intrinsic subroutine random_init", false},
     {"Kind of the do variable in implied do", false},
     {"Locality clauses in do concurrent", false},
     {"Control of host association", false},
@@ -848,6 +850,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       }
     } else if (fnName == "reduce") {
       features["New reduction intrinsic reduce"] = true;
+    } else if (fnName == "coshape") {
+      features["Intrinsic function coshape"] = true;
+    } else if (fnName == "random_init") {
+      features["Intrinsic subroutine random_init"] = true;
     } else if (computing_environment_intrinsics.find(fnName) !=
         computing_environment_intrinsics.end()) {
       features
@@ -1270,6 +1276,8 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Implicit none enhancement");
   checkMap("Changes to Intrinsics that access the computing environment");
   checkMap("New reduction intrinsic reduce");
+  checkMap("Intrinsic function coshape");
+  checkMap("Intrinsic subroutine random_init");
   checkMap("Kind of the do variable in implied do");
   checkMap("Locality clauses in do concurrent");
   checkMap("Control of host association");
