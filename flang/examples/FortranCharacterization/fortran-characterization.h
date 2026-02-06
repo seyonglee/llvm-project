@@ -66,6 +66,8 @@ public:
 
   static std::unordered_set<std::string> used_modules;
 
+  static std::unordered_set<std::string> computing_environment_intrinsics;
+
   static bool use_iso_Fortran_env;
 
   static bool is_in_c_binding_procedure;
@@ -168,6 +170,7 @@ public:
   // - Function for C sizeof (Fortran 2008)
   // - Assumed rank (Fortran 2018)
   // - Simplification of calls of the intrinsic cmplx (Fortran 2018)
+  // - Changes to Intrinsics that access the computing environment (Fortran 2018)
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);

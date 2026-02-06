@@ -125,6 +125,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Contiguous attribute for assumed-rank arrays", false},
     {"Default accessibility for entities accessed from a module", false},
     {"Implicit none enhancement", false},
+    {"Changes to Intrinsics that access the computing environment", false},
     {"Kind of the do variable in implied do", false},
     {"Locality clauses in do concurrent", false},
     {"Control of host association", false},
@@ -139,6 +140,11 @@ std::vector<std::string> FeatureCharacterization::Fortran_intrinsic_modules{
     "ieee_status_type"};
 
 std::unordered_set<std::string> FeatureCharacterization::used_modules;
+
+std::unordered_set<std::string>
+    FeatureCharacterization::computing_environment_intrinsics{"get_command",
+        "get_command_argument", "command_argument_count",
+        "get_environment_variable"};
 
 bool FeatureCharacterization::use_iso_Fortran_env = false;
 
@@ -770,13 +776,7 @@ void FeatureCharacterization::Post(const parser::Call &c) {
   const auto &pd{std::get<ProcedureDesignator>(c.t)};
   if (const auto *const name{std::get_if<Name>(&pd.u)}) {
     CONVERT2LOWERCASE(name->ToString(), fnName);
-    if (fnName == "get_command_argument" ||
-        fnName == "command_argument_count" ||
-        fnName == "get_environment_variable" || fnName == "get_command") {
-      features
-          ["Access to the computing environment (Command line processing)"] =
-              true;
-    } else if (fnName == "null") {
+    if (fnName == "null") {
       features["New and enhanced intrinsic procedures"] = true;
       features["Initialization of pointers with NULL function"] = true;
     } else if (fnName == "cpu_time") {
@@ -844,6 +844,22 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       }
       if (!found_kind) {
         features["Simplification of calls of the intrinsic cmplx"] = true;
+      }
+    } else if (computing_environment_intrinsics.find(fnName) !=
+        computing_environment_intrinsics.end()) {
+      features
+          ["Access to the computing environment (Command line processing)"] =
+              true;
+      for (const auto &arg : actArgSpecs) {
+        const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+        if (optKeyword.has_value()) {
+          CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
+          if (kw == "errmsg") {
+            features["Changes to Intrinsics that access the computing "
+                     "environment"] = true;
+            break;
+          }
+        }
       }
     } else {
       for (const auto &p : Fortran2003_interop_c_procedures) {
@@ -1249,6 +1265,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Contiguous attribute for assumed-rank arrays");
   checkMap("Default accessibility for entities accessed from a module");
   checkMap("Implicit none enhancement");
+  checkMap("Changes to Intrinsics that access the computing environment");
   checkMap("Kind of the do variable in implied do");
   checkMap("Locality clauses in do concurrent");
   checkMap("Control of host association");
