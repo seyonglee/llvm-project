@@ -68,6 +68,10 @@ public:
 
   static std::unordered_set<std::string> computing_environment_intrinsics;
 
+  static std::unordered_set<std::string> user_defined_operators;
+
+  static std::unordered_set<std::string> user_defined_assignment;
+
   static bool use_iso_Fortran_env;
 
   static bool is_in_c_binding_procedure;
@@ -75,6 +79,10 @@ public:
   static bool is_in_pure_procedure;
 
   static bool is_in_module;
+
+  static bool is_in_user_defined_operator_function;
+
+  static bool is_in_user_defined_assignment_subroutine;
 
   // - Constants in ISO_FORTRAN_ENV (Fortran 2008)
   void Post(const parser::Name &);
@@ -179,8 +187,12 @@ public:
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
+  // - The value attribute for an argument of a defined operation or assignment
+  // (Fortran 2018)
   void Post(const parser::TypeBoundProcBinding &tbpb);
-  void Post(const parser::InterfaceStmt &is);
+  // - The value attribute for an argument of a defined operation or assignment
+  // (Fortran 2018)
+  void Post(const parser::InterfaceBlock &ib);
   // - Interoperability of derived types
   void Post(const parser::TypeAttrSpec::BindC &);
   // - Interoperability of procedures

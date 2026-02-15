@@ -132,6 +132,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Kind of the do variable in implied do", false},
     {"Locality clauses in do concurrent", false},
     {"Control of host association", false},
+    {"The value attribute for an argument of a defined operation or assignment",
+        false},
     {"Simplification of calls of the intrinsic cmplx", false},
     {"Removal of anomalies regarding pure procedures", false},
     {"Recursive and non-recursive procedures", false}
@@ -150,6 +152,11 @@ std::unordered_set<std::string>
         "get_command_argument", "command_argument_count",
         "get_environment_variable"};
 
+std::unordered_set<std::string> FeatureCharacterization::user_defined_operators;
+
+std::unordered_set<std::string>
+    FeatureCharacterization::user_defined_assignment;
+
 bool FeatureCharacterization::use_iso_Fortran_env = false;
 
 bool FeatureCharacterization::is_in_c_binding_procedure = false;
@@ -157,6 +164,10 @@ bool FeatureCharacterization::is_in_c_binding_procedure = false;
 bool FeatureCharacterization::is_in_pure_procedure = false;
 
 bool FeatureCharacterization::is_in_module = false;
+
+bool FeatureCharacterization::is_in_user_defined_operator_function = false;
+
+bool FeatureCharacterization::is_in_user_defined_assignment_subroutine = false;
 
 void FeatureCharacterization::Post(const parser::Name &name) {
   if (use_iso_Fortran_env) {
@@ -511,16 +522,14 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
         features["Attribute codes"] = true;
         features["The type CFI_dim_t"] = true;
       }
-    }
-    if (std::holds_alternative<parser::Pointer>(attrSpec.u)) {
+    } else if (std::holds_alternative<parser::Pointer>(attrSpec.u)) {
       pointerAttr = true;
       if (is_in_c_binding_procedure) {
         features["C descriptors"] = true;
         features["Attribute codes"] = true;
         features["The type CFI_dim_t"] = true;
       }
-    }
-    if (std::holds_alternative<parser::ArraySpec>(attrSpec.u)) {
+    } else if (std::holds_alternative<parser::ArraySpec>(attrSpec.u)) {
       arraySpecAttr = true;
       auto const *arraySpec = std::get_if<parser::ArraySpec>(&attrSpec.u);
       if (std::holds_alternative<std::list<AssumedShapeSpec>>(arraySpec->u)) {
@@ -544,23 +553,25 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
           features["Contiguous attribute for assumed-rank arrays"] = true;
         }
       }
-    }
-    if (std::holds_alternative<parser::CoarraySpec>(attrSpec.u)) {
+    } else if (std::holds_alternative<parser::CoarraySpec>(attrSpec.u)) {
       coarraySpecAttr = true;
-    }
-    if (std::holds_alternative<parser::LanguageBindingSpec>(attrSpec.u)) {
+    } else if (std::holds_alternative<parser::LanguageBindingSpec>(
+                   attrSpec.u)) {
       features["Interoperability of global data"] = true;
-    }
-    if (std::holds_alternative<parser::Save>(attrSpec.u)) {
+    } else if (std::holds_alternative<parser::Save>(attrSpec.u)) {
       saveAttr = true;
-    }
-    if (std::holds_alternative<parser::Target>(attrSpec.u)) {
+    } else if (std::holds_alternative<parser::Target>(attrSpec.u)) {
       targetAttr = true;
-    }
-    if (std::holds_alternative<parser::Contiguous>(attrSpec.u)) {
+    } else if (std::holds_alternative<parser::Contiguous>(attrSpec.u)) {
       contiguousAttr = true;
       if (assumedRankAttr) {
         features["Contiguous attribute for assumed-rank arrays"] = true;
+      }
+    } else if (std::holds_alternative<parser::Value>(attrSpec.u)) {
+      if (is_in_user_defined_operator_function ||
+          is_in_user_defined_assignment_subroutine) {
+        features["The value attribute for an argument of a defined operation "
+                 "or assignment"] = true;
       }
     }
   }
@@ -911,14 +922,25 @@ void FeatureCharacterization::Post(const parser::TypeBoundProcBinding &tbpb) {
   features["Procedures bound by name to a type (type-bound procedures)"] = true;
   if (const auto *const tbgs{std::get_if<TypeBoundGenericStmt>(&tbpb.u)}) {
     const auto &genericSpec{std::get<Indirection<GenericSpec>>(tbgs->t)};
-    // if (const auto *definedOp{
-    //         std::get_if<parser::DefinedOperator>(&genericSpec.value().u)})
-    //   if (const auto *intrinsicOp{
-    //           std::get_if<parser::DefinedOperator::IntrinsicOperator>(
-    //               &(definedOp->u))})
-    // }
-    if (std::get_if<parser::GenericSpec::ReadFormatted>(
-            &genericSpec.value().u) ||
+    if (const auto *definedOp{
+            std::get_if<parser::DefinedOperator>(&genericSpec.value().u)}) {
+      if (std::get_if<parser::DefinedOperator::IntrinsicOperator>(
+              &(definedOp->u))) {
+        const auto fNameList{std::get<std::list<parser::Name>>(tbgs->t)};
+        for (const auto &name : fNameList) {
+          CONVERT2LOWERCASE(name.ToString(), nameString);
+          user_defined_operators.insert(nameString);
+        }
+      }
+    } else if (std::get_if<parser::GenericSpec::Assignment>(
+                   &genericSpec.value().u)) {
+      const auto fNameList{std::get<std::list<parser::Name>>(tbgs->t)};
+      for (const auto &name : fNameList) {
+        CONVERT2LOWERCASE(name.ToString(), nameString);
+        user_defined_assignment.insert(nameString);
+      }
+    } else if (std::get_if<parser::GenericSpec::ReadFormatted>(
+                   &genericSpec.value().u) ||
         std::get_if<parser::GenericSpec::ReadUnformatted>(
             &genericSpec.value().u) ||
         std::get_if<parser::GenericSpec::WriteFormatted>(
@@ -929,19 +951,52 @@ void FeatureCharacterization::Post(const parser::TypeBoundProcBinding &tbpb) {
     }
   }
 }
-void FeatureCharacterization::Post(const parser::InterfaceStmt &is) {
-  if (const auto &genericSpec{
+void FeatureCharacterization::Post(const parser::InterfaceBlock &ib) {
+  const auto &ispeclist{
+      std::get<std::list<parser::InterfaceSpecification>>(ib.t)};
+  const auto &is{
+      std::get<parser::Statement<parser::InterfaceStmt>>(ib.t).statement};
+  if (const auto *genericSpec{
           std::get_if<std::optional<parser::GenericSpec>>(&is.u)}) {
-    if (genericSpec->has_value() &&
-        (std::get_if<parser::GenericSpec::ReadFormatted>(
-             &genericSpec->value().u) ||
-            std::get_if<parser::GenericSpec::ReadUnformatted>(
-                &genericSpec->value().u) ||
-            std::get_if<parser::GenericSpec::WriteFormatted>(
-                &genericSpec->value().u) ||
-            std::get_if<parser::GenericSpec::WriteUnformatted>(
-                &genericSpec->value().u))) {
-      features["Derived type I/O"] = true;
+    if (genericSpec->has_value()) {
+      if (std::get_if<parser::GenericSpec::ReadFormatted>(
+              &genericSpec->value().u) ||
+          std::get_if<parser::GenericSpec::ReadUnformatted>(
+              &genericSpec->value().u) ||
+          std::get_if<parser::GenericSpec::WriteFormatted>(
+              &genericSpec->value().u) ||
+          std::get_if<parser::GenericSpec::WriteUnformatted>(
+              &genericSpec->value().u)) {
+        features["Derived type I/O"] = true;
+      } else if (const auto *definedOp{std::get_if<parser::DefinedOperator>(
+                     &genericSpec->value().u)}) {
+        if (std::get_if<parser::DefinedOperator::IntrinsicOperator>(
+                &(definedOp->u))) {
+          for (const auto &ispec : ispeclist) {
+            const auto *ps{
+                std::get_if<parser::Statement<parser::ProcedureStmt>>(
+                    &ispec.u)};
+            const auto &nameList{
+                std::get<std::list<parser::Name>>(ps->statement.t)};
+            for (const auto &name : nameList) {
+              CONVERT2LOWERCASE(name.ToString(), nameString);
+              user_defined_operators.insert(nameString);
+            }
+          }
+        }
+      } else if (std::get_if<parser::GenericSpec::Assignment>(
+                     &genericSpec->value().u)) {
+        for (const auto &ispec : ispeclist) {
+          const auto *ps{
+              std::get_if<parser::Statement<parser::ProcedureStmt>>(&ispec.u)};
+          const auto &nameList{
+              std::get<std::list<parser::Name>>(ps->statement.t)};
+          for (const auto &name : nameList) {
+            CONVERT2LOWERCASE(name.ToString(), nameString);
+            user_defined_assignment.insert(nameString);
+          }
+        }
+      }
     }
   }
 }
@@ -966,10 +1021,17 @@ void FeatureCharacterization::Post(const parser::SubroutineStmt &sts) {
   } else {
     is_in_c_binding_procedure = false;
   }
+  const auto &fName{std::get<parser::Name>(sts.t)};
+  CONVERT2LOWERCASE(fName.ToString(), nameString);
+  if (user_defined_assignment.find(nameString) !=
+      user_defined_assignment.end()) {
+    is_in_user_defined_assignment_subroutine = true;
+  }
 }
 void FeatureCharacterization::Post(const parser::EndSubroutineStmt &ests) {
   is_in_c_binding_procedure = false;
   is_in_pure_procedure = false;
+  is_in_user_defined_assignment_subroutine = false;
 }
 void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
   const auto &sufx{std::get<std::optional<Suffix>>(fts.t)};
@@ -979,10 +1041,16 @@ void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
   } else {
     is_in_c_binding_procedure = false;
   }
+  const auto &fName{std::get<parser::Name>(fts.t)};
+  CONVERT2LOWERCASE(fName.ToString(), nameString);
+  if (user_defined_operators.find(nameString) != user_defined_operators.end()) {
+    is_in_user_defined_operator_function = true;
+  }
 }
 void FeatureCharacterization::Post(const parser::EndFunctionStmt &efts) {
   is_in_c_binding_procedure = false;
   is_in_pure_procedure = false;
+  is_in_user_defined_operator_function = false;
 }
 void FeatureCharacterization::Post(const parser::BindStmt &) {
   features["Interoperability of global data"] = true;
@@ -1284,6 +1352,8 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Kind of the do variable in implied do");
   checkMap("Locality clauses in do concurrent");
   checkMap("Control of host association");
+  checkMap("The value attribute for an argument of a defined operation or "
+           "assignment");
   checkMap("Simplification of calls of the intrinsic cmplx");
   checkMap("Removal of anomalies regarding pure procedures");
   checkMap("Recursive and non-recursive procedures");
