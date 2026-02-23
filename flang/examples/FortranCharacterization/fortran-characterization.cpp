@@ -1239,6 +1239,89 @@ void FeatureCharacterization::Post(const parser::AssignmentStmt &as) {
   }
 }
 
+void FeatureCharacterization::Post(const parser::ReadStmt &rs) {
+  for (const auto &titem : rs.items) {
+    if (const auto *const var{std::get_if<parser::Variable>(&titem.u)}) {
+      if (const auto *dsn{
+              std::get_if<common::Indirection<parser::Designator>>(&var->u)}) {
+        if (const auto *dr{std::get_if<parser::DataRef>(&dsn->value().u)}) {
+          if (const auto *name{std::get_if<parser::Name>(&dr->u)}) {
+            CONVERT2LOWERCASE(name->ToString(), nameString);
+            if (pure_value_dummy_arguments.find(nameString) !=
+                pure_value_dummy_arguments.end()) {
+              features["Removal of anomalies regarding pure procedures"] = true;
+            }
+          } else if (const auto *ar{
+                         std::get_if<common::Indirection<parser::ArrayElement>>(
+                             &dr->u)}) {
+            const auto &base{ar->value().base};
+            if (const auto *name{std::get_if<parser::Name>(&base.u)}) {
+              CONVERT2LOWERCASE(name->ToString(), nameString);
+              if (pure_value_dummy_arguments.find(nameString) !=
+                  pure_value_dummy_arguments.end()) {
+                features["Removal of anomalies regarding pure procedures"] =
+                    true;
+              }
+            }
+          }
+        } else if (const auto *substr{
+                       std::get_if<parser::Substring>(&dsn->value().u)}) {
+          const auto &dref{std::get<parser::DataRef>(substr->t)};
+          if (const auto *name{std::get_if<parser::Name>(&dref.u)}) {
+            CONVERT2LOWERCASE(name->ToString(), nameString);
+            if (pure_value_dummy_arguments.find(nameString) !=
+                pure_value_dummy_arguments.end()) {
+              features["Removal of anomalies regarding pure procedures"] = true;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void FeatureCharacterization::Post(const parser::WriteStmt &ws) {
+  if (ws.iounit.has_value()) {
+    const auto &tunit{ws.iounit.value()};
+    if (const auto *var{std::get_if<parser::Variable>(&tunit.u)}) {
+      if (const auto *dsn{
+              std::get_if<common::Indirection<parser::Designator>>(&var->u)}) {
+        if (const auto *dr{std::get_if<parser::DataRef>(&dsn->value().u)}) {
+          if (const auto *name{std::get_if<parser::Name>(&dr->u)}) {
+            CONVERT2LOWERCASE(name->ToString(), nameString);
+            if (pure_value_dummy_arguments.find(nameString) !=
+                pure_value_dummy_arguments.end()) {
+              features["Removal of anomalies regarding pure procedures"] = true;
+            }
+          } else if (const auto *ar{
+                         std::get_if<common::Indirection<parser::ArrayElement>>(
+                             &dr->u)}) {
+            const auto &base{ar->value().base};
+            if (const auto *name{std::get_if<parser::Name>(&base.u)}) {
+              CONVERT2LOWERCASE(name->ToString(), nameString);
+              if (pure_value_dummy_arguments.find(nameString) !=
+                  pure_value_dummy_arguments.end()) {
+                features["Removal of anomalies regarding pure procedures"] =
+                    true;
+              }
+            }
+          }
+        } else if (const auto *substr{
+                       std::get_if<parser::Substring>(&dsn->value().u)}) {
+          const auto &dref{std::get<parser::DataRef>(substr->t)};
+          if (const auto *name{std::get_if<parser::Name>(&dref.u)}) {
+            CONVERT2LOWERCASE(name->ToString(), nameString);
+            if (pure_value_dummy_arguments.find(nameString) !=
+                pure_value_dummy_arguments.end()) {
+              features["Removal of anomalies regarding pure procedures"] = true;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 ///////////////////////
 // Utility Functions //
 ///////////////////////

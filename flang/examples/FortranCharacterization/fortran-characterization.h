@@ -267,6 +267,10 @@ public:
   void Post(const parser::AccessStmt &);
   // - Removal of anomalies regarding pure procedures
   void Post(const parser::AssignmentStmt &);
+  // - Removal of anomalies regarding pure procedures
+  void Post(const parser::ReadStmt &);
+  // - Removal of anomalies regarding pure procedures
+  void Post(const parser::WriteStmt &);
 
 protected:
 private:
