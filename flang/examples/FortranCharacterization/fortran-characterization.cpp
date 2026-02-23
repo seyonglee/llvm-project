@@ -134,8 +134,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Control of host association", false},
     {"The value attribute for an argument of a defined operation or assignment",
         false},
-    {"Simplification of calls of the intrinsic cmplx", false},
     {"Removal of anomalies regarding pure procedures", false},
+    {"Simplification of calls of the intrinsic cmplx", false},
     {"Recursive and non-recursive procedures", false}
     /* Add other Fortran 2018 Features */
 };
@@ -156,6 +156,11 @@ std::unordered_set<std::string> FeatureCharacterization::user_defined_operators;
 
 std::unordered_set<std::string>
     FeatureCharacterization::user_defined_assignment;
+
+std::unordered_set<std::string> FeatureCharacterization::dummy_arguments;
+
+std::unordered_set<std::string>
+    FeatureCharacterization::pure_value_dummy_arguments;
 
 bool FeatureCharacterization::use_iso_Fortran_env = false;
 
@@ -514,6 +519,7 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   bool targetAttr{false};
   bool contiguousAttr{false};
   bool assumedRankAttr{false};
+  bool valueAttr{false};
   for (const parser::AttrSpec &attrSpec : attrSpecList) {
     if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
       allocatableAttr = true;
@@ -568,6 +574,7 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
         features["Contiguous attribute for assumed-rank arrays"] = true;
       }
     } else if (std::holds_alternative<parser::Value>(attrSpec.u)) {
+      valueAttr = true;
       if (is_in_user_defined_operator_function ||
           is_in_user_defined_assignment_subroutine) {
         features["The value attribute for an argument of a defined operation "
@@ -580,6 +587,12 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   }
   checkDeclarationTypeSpec(dts, pointerAttr || allocatableAttr);
   for (const parser::EntityDecl &ed : entityDeclList) {
+    auto const &entityName{std::get<ObjectName>(ed.t)};
+    CONVERT2LOWERCASE(entityName.ToString(), enString);
+    if (valueAttr && is_in_pure_procedure &&
+        (dummy_arguments.find(enString) != dummy_arguments.end())) {
+      pure_value_dummy_arguments.insert(enString);
+    }
     if (std::get<std::optional<parser::ArraySpec>>(ed.t).has_value()) {
       auto const &arraySpec{
           std::get<std::optional<parser::ArraySpec>>(ed.t).value()};
@@ -1027,11 +1040,19 @@ void FeatureCharacterization::Post(const parser::SubroutineStmt &sts) {
       user_defined_assignment.end()) {
     is_in_user_defined_assignment_subroutine = true;
   }
+  const auto &dummyArgs{std::get<std::list<parser::DummyArg>>(sts.t)};
+  for (const auto &dummyArg : dummyArgs) {
+    const auto *dummyArgName{std::get_if<parser::Name>(&dummyArg.u)};
+    CONVERT2LOWERCASE(dummyArgName->ToString(), dummyArgString);
+    dummy_arguments.insert(dummyArgString);
+  }
 }
 void FeatureCharacterization::Post(const parser::EndSubroutineStmt &ests) {
   is_in_c_binding_procedure = false;
   is_in_pure_procedure = false;
   is_in_user_defined_assignment_subroutine = false;
+  dummy_arguments.clear();
+  pure_value_dummy_arguments.clear();
 }
 void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
   const auto &sufx{std::get<std::optional<Suffix>>(fts.t)};
@@ -1046,11 +1067,18 @@ void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
   if (user_defined_operators.find(nameString) != user_defined_operators.end()) {
     is_in_user_defined_operator_function = true;
   }
+  const auto &dummyArgs{std::get<std::list<parser::Name>>(fts.t)};
+  for (const auto &dummyArg : dummyArgs) {
+    CONVERT2LOWERCASE(dummyArg.ToString(), dummyArgString);
+    dummy_arguments.insert(dummyArgString);
+  }
 }
 void FeatureCharacterization::Post(const parser::EndFunctionStmt &efts) {
   is_in_c_binding_procedure = false;
   is_in_pure_procedure = false;
   is_in_user_defined_operator_function = false;
+  dummy_arguments.clear();
+  pure_value_dummy_arguments.clear();
 }
 void FeatureCharacterization::Post(const parser::BindStmt &) {
   features["Interoperability of global data"] = true;
@@ -1168,6 +1196,43 @@ void FeatureCharacterization::Post(const parser::AccessStmt &as) {
               ["Default accessibility for entities accessed from a module"] =
                   true;
           break;
+        }
+      }
+    }
+  }
+}
+void FeatureCharacterization::Post(const parser::AssignmentStmt &as) {
+  const auto &var{std::get<parser::Variable>(as.t)};
+  if (const auto *dsn{
+          std::get_if<common::Indirection<parser::Designator>>(&var.u)}) {
+    const auto &designator{dsn->value()};
+    if (const auto *dr{std::get_if<parser::DataRef>(&designator.u)}) {
+      if (const auto *name{std::get_if<parser::Name>(&dr->u)}) {
+        CONVERT2LOWERCASE(name->ToString(), nameString);
+        if (pure_value_dummy_arguments.find(nameString) !=
+            pure_value_dummy_arguments.end()) {
+          features["Removal of anomalies regarding pure procedures"] = true;
+        }
+      } else if (const auto *ar{
+                     std::get_if<common::Indirection<parser::ArrayElement>>(
+                         &dr->u)}) {
+        const auto &base{ar->value().base};
+        if (const auto *name{std::get_if<parser::Name>(&base.u)}) {
+          CONVERT2LOWERCASE(name->ToString(), nameString);
+          if (pure_value_dummy_arguments.find(nameString) !=
+              pure_value_dummy_arguments.end()) {
+            features["Removal of anomalies regarding pure procedures"] = true;
+          }
+        }
+      }
+    } else if (const auto *substr{
+                   std::get_if<parser::Substring>(&designator.u)}) {
+      const auto &dref{std::get<parser::DataRef>(substr->t)};
+      if (const auto *name{std::get_if<parser::Name>(&dref.u)}) {
+        CONVERT2LOWERCASE(name->ToString(), nameString);
+        if (pure_value_dummy_arguments.find(nameString) !=
+            pure_value_dummy_arguments.end()) {
+          features["Removal of anomalies regarding pure procedures"] = true;
         }
       }
     }
@@ -1354,8 +1419,8 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Control of host association");
   checkMap("The value attribute for an argument of a defined operation or "
            "assignment");
-  checkMap("Simplification of calls of the intrinsic cmplx");
   checkMap("Removal of anomalies regarding pure procedures");
+  checkMap("Simplification of calls of the intrinsic cmplx");
   checkMap("Recursive and non-recursive procedures");
   out_ << "}\n";
 }

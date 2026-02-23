@@ -72,6 +72,10 @@ public:
 
   static std::unordered_set<std::string> user_defined_assignment;
 
+  static std::unordered_set<std::string> dummy_arguments;
+
+  static std::unordered_set<std::string> pure_value_dummy_arguments;
+
   static bool use_iso_Fortran_env;
 
   static bool is_in_c_binding_procedure;
@@ -261,6 +265,8 @@ public:
   void Post(const parser::EndModuleStmt &);
   // - Default accessibility for entities accessed from a module
   void Post(const parser::AccessStmt &);
+  // - Removal of anomalies regarding pure procedures
+  void Post(const parser::AssignmentStmt &);
 
 protected:
 private:
