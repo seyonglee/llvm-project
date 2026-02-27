@@ -136,6 +136,8 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
         false},
     {"Removal of anomalies regarding pure procedures", false},
     {"Simplification of calls of the intrinsic cmplx", false},
+    {"Removal of the restriction on argument dim of many intrinsic functions",
+        false},
     {"Recursive and non-recursive procedures", false}
     /* Add other Fortran 2018 Features */
 };
@@ -161,6 +163,9 @@ std::unordered_set<std::string> FeatureCharacterization::dummy_arguments;
 
 std::unordered_set<std::string>
     FeatureCharacterization::pure_value_dummy_arguments;
+
+std::unordered_set<std::string>
+    FeatureCharacterization::optional_dummy_arguments;
 
 bool FeatureCharacterization::use_iso_Fortran_env = false;
 
@@ -520,6 +525,7 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   bool contiguousAttr{false};
   bool assumedRankAttr{false};
   bool valueAttr{false};
+  bool optionalAttr{false};
   for (const parser::AttrSpec &attrSpec : attrSpecList) {
     if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
       allocatableAttr = true;
@@ -580,6 +586,8 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
         features["The value attribute for an argument of a defined operation "
                  "or assignment"] = true;
       }
+    } else if (std::holds_alternative<parser::Optional>(attrSpec.u)) {
+      optionalAttr = true;
     }
   }
   if (saveAttr && targetAttr) {
@@ -592,6 +600,10 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
     if (valueAttr && is_in_pure_procedure &&
         (dummy_arguments.find(enString) != dummy_arguments.end())) {
       pure_value_dummy_arguments.insert(enString);
+    }
+    if (optionalAttr &&
+        (dummy_arguments.find(enString) != dummy_arguments.end())) {
+      optional_dummy_arguments.insert(enString);
     }
     if (std::get<std::optional<parser::ArraySpec>>(ed.t).has_value()) {
       auto const &arraySpec{
@@ -881,6 +893,52 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       features["Intrinsic function coshape"] = true;
     } else if (fnName == "random_init") {
       features["Intrinsic subroutine random_init"] = true;
+    } else if (fnName == "all" || fnName == "any" || fnName == "norm2" ||
+        fnName == "parity") {
+      if (actArgSpecs.size() == 2) {
+        const auto &argSpec = std::get<ActualArg>(actArgSpecs.back().t);
+        if (const auto *argExprPtr =
+                std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+          const auto &argExpr = argExprPtr->value();
+          if (const auto *const dsn =
+                  std::get_if<Indirection<Designator>>(&argExpr.u)) {
+            if (const auto *const dref =
+                    std::get_if<DataRef>(&dsn->value().u)) {
+              if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                CONVERT2LOWERCASE(tname->ToString(), tnameStr);
+                if (optional_dummy_arguments.find(tnameStr) !=
+                    optional_dummy_arguments.end()) {
+                  features["Removal of the restriction on argument dim of many "
+                           "intrinsic functions"] = true;
+                }
+              }
+            }
+          }
+        }
+      }
+    } else if (fnName == "this_image") {
+      if (actArgSpecs.size() > 1) {
+        auto it_next = std::next(actArgSpecs.begin(), 1);
+        const auto &argSpec = std::get<ActualArg>(it_next->t);
+        if (const auto *argExprPtr =
+                std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+          const auto &argExpr = argExprPtr->value();
+          if (const auto *const dsn =
+                  std::get_if<Indirection<Designator>>(&argExpr.u)) {
+            if (const auto *const dref =
+                    std::get_if<DataRef>(&dsn->value().u)) {
+              if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                CONVERT2LOWERCASE(tname->ToString(), tnameStr);
+                if (optional_dummy_arguments.find(tnameStr) !=
+                    optional_dummy_arguments.end()) {
+                  features["Removal of the restriction on argument dim of many "
+                           "intrinsic functions"] = true;
+                }
+              }
+            }
+          }
+        }
+      }
     } else if (computing_environment_intrinsics.find(fnName) !=
         computing_environment_intrinsics.end()) {
       features
@@ -1053,6 +1111,7 @@ void FeatureCharacterization::Post(const parser::EndSubroutineStmt &ests) {
   is_in_user_defined_assignment_subroutine = false;
   dummy_arguments.clear();
   pure_value_dummy_arguments.clear();
+  optional_dummy_arguments.clear();
 }
 void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
   const auto &sufx{std::get<std::optional<Suffix>>(fts.t)};
@@ -1079,6 +1138,7 @@ void FeatureCharacterization::Post(const parser::EndFunctionStmt &efts) {
   is_in_user_defined_operator_function = false;
   dummy_arguments.clear();
   pure_value_dummy_arguments.clear();
+  optional_dummy_arguments.clear();
 }
 void FeatureCharacterization::Post(const parser::BindStmt &) {
   features["Interoperability of global data"] = true;
@@ -1504,6 +1564,8 @@ void FeatureCharacterization::checkAllFeatures() {
            "assignment");
   checkMap("Removal of anomalies regarding pure procedures");
   checkMap("Simplification of calls of the intrinsic cmplx");
+  checkMap(
+      "Removal of the restriction on argument dim of many intrinsic functions");
   checkMap("Recursive and non-recursive procedures");
   out_ << "}\n";
 }

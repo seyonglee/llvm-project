@@ -76,6 +76,8 @@ public:
 
   static std::unordered_set<std::string> pure_value_dummy_arguments;
 
+  static std::unordered_set<std::string> optional_dummy_arguments;
+
   static bool use_iso_Fortran_env;
 
   static bool is_in_c_binding_procedure;
@@ -188,6 +190,8 @@ public:
   // - New reduction intrinsic reduce (Fortran 2018)
   // - Intrinsic function coshape (Fortran 2018)
   // - Intrinsic subroutine random_init (Fortran 2018)
+  // - Removal of the restriction on argument dim of many intrinsic functions
+  // (Fortran 2018)
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
