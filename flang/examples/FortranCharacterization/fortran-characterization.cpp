@@ -834,18 +834,6 @@ void FeatureCharacterization::Post(const parser::Call &c) {
           }
         }
       }
-    } else if (fnName == "maxloc" || fnName == "minloc") {
-      for (const auto &arg : actArgSpecs) {
-        const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
-        if (optKeyword.has_value()) {
-          CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
-          if (kw == "back") {
-            features["Optional back argument added to maxloc and minloc"] =
-                true;
-            break;
-          }
-        }
-      }
     } else if (fnName == "selected_int_kind") {
       for (const auto &arg : actArgSpecs) {
         const auto &argSpec = std::get<ActualArg>(arg.t);
@@ -918,25 +906,152 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       }
     } else if (fnName == "this_image") {
       if (actArgSpecs.size() > 1) {
-        auto it_next = std::next(actArgSpecs.begin(), 1);
-        const auto &argSpec = std::get<ActualArg>(it_next->t);
-        if (const auto *argExprPtr =
-                std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
-          const auto &argExpr = argExprPtr->value();
-          if (const auto *const dsn =
-                  std::get_if<Indirection<Designator>>(&argExpr.u)) {
-            if (const auto *const dref =
-                    std::get_if<DataRef>(&dsn->value().u)) {
-              if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
-                CONVERT2LOWERCASE(tname->ToString(), tnameStr);
-                if (optional_dummy_arguments.find(tnameStr) !=
-                    optional_dummy_arguments.end()) {
-                  features["Removal of the restriction on argument dim of many "
+        int tIndex = 0;
+        bool keyword_used = false;
+        bool found_dim = false;
+        for (const auto &arg : actArgSpecs) {
+          const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+          if (optKeyword.has_value()) {
+            keyword_used = true;
+            CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
+            if (kw == "dim") {
+              found_dim = true;
+            }
+          } else {
+            keyword_used = false;
+          }
+          if (found_dim || (!keyword_used && (tIndex == 1))) {
+            const auto &argSpec = std::get<ActualArg>(arg.t);
+            if (const auto *argExprPtr =
+                    std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+              const auto &argExpr = argExprPtr->value();
+              if (const auto *const dsn =
+                      std::get_if<Indirection<Designator>>(&argExpr.u)) {
+                if (const auto *const dref =
+                        std::get_if<DataRef>(&dsn->value().u)) {
+                  if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                    CONVERT2LOWERCASE(tname->ToString(), tnameStr);
+                    if (optional_dummy_arguments.find(tnameStr) !=
+                        optional_dummy_arguments.end()) {
+                      features
+                          ["Removal of the restriction on argument dim of many "
                            "intrinsic functions"] = true;
+                    }
+                  }
                 }
               }
             }
+            break;
           }
+          tIndex++;
+        }
+      }
+    } else if (fnName == "iall" || fnName == "iany" || fnName == "iparity" ||
+        fnName == "maxval" || fnName == "minval" || fnName == "product" ||
+        fnName == "sum" || fnName == "maxloc" || fnName == "minloc") {
+      if (actArgSpecs.size() > 1) {
+        int tIndex = 0;
+        bool keyword_used = false;
+        bool found_dim = false;
+        for (const auto &arg : actArgSpecs) {
+          const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+          if (optKeyword.has_value()) {
+            keyword_used = true;
+            CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
+            if (kw == "dim") {
+              found_dim = true;
+            } else if (kw == "back") {
+              if (fnName == "maxloc" || fnName == "minloc") {
+                features["Optional back argument added to maxloc and minloc"] =
+                    true;
+              }
+            }
+          } else {
+            keyword_used = false;
+            if (fnName == "maxloc" || fnName == "minloc") {
+              if (tIndex == 4) {
+                features["Optional back argument added to maxloc and minloc"] =
+                    true;
+              } else if (tIndex == 3) {
+                //[FIXME] If this is the last argument and its type is logical,
+                // then it is the back argument.
+                // features["Optional back argument added to maxloc and minloc"]
+                // = true;
+              }
+            }
+          }
+          //[FIXME] If keyword is not used, we need to check the type of the
+          // second argument to see whether it is dim or not.
+          // if (found_dim || (!keyword_used && (tIndex == 1)))
+          if (found_dim) {
+            const auto &argSpec = std::get<ActualArg>(arg.t);
+            if (const auto *argExprPtr =
+                    std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+              const auto &argExpr = argExprPtr->value();
+              if (const auto *const dsn =
+                      std::get_if<Indirection<Designator>>(&argExpr.u)) {
+                if (const auto *const dref =
+                        std::get_if<DataRef>(&dsn->value().u)) {
+                  if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                    CONVERT2LOWERCASE(tname->ToString(), tnameStr);
+                    if (optional_dummy_arguments.find(tnameStr) !=
+                        optional_dummy_arguments.end()) {
+                      features
+                          ["Removal of the restriction on argument dim of many "
+                           "intrinsic functions"] = true;
+                    }
+                  }
+                }
+              }
+            }
+            break;
+          }
+          tIndex++;
+        }
+      }
+    } else if (fnName == "findloc") {
+      if (actArgSpecs.size() > 2) {
+        int tIndex = 0;
+        bool keyword_used = false;
+        bool found_dim = false;
+        for (const auto &arg : actArgSpecs) {
+          const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+          if (optKeyword.has_value()) {
+            keyword_used = true;
+            CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
+            if (kw == "dim") {
+              found_dim = true;
+            }
+          } else {
+            keyword_used = false;
+          }
+          //[FIXME] If keyword is not used, we need to check the type of the
+          // third argument to see whether it is dim or not.
+          // if (found_dim || (!keyword_used && (tIndex == 2)))
+          if (found_dim) {
+            const auto &argSpec = std::get<ActualArg>(arg.t);
+            if (const auto *argExprPtr =
+                    std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+              const auto &argExpr = argExprPtr->value();
+              if (const auto *const dsn =
+                      std::get_if<Indirection<Designator>>(&argExpr.u)) {
+                if (const auto *const dref =
+                        std::get_if<DataRef>(&dsn->value().u)) {
+                  if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                    CONVERT2LOWERCASE(tname->ToString(), tnameStr);
+                    if (optional_dummy_arguments.find(tnameStr) !=
+                        optional_dummy_arguments.end()) {
+                      features
+                          ["Removal of the restriction on argument dim of many "
+                           "intrinsic functions"] = true;
+                    }
+                  }
+                }
+              }
+            }
+            break;
+          }
+          tIndex++;
         }
       }
     } else if (computing_environment_intrinsics.find(fnName) !=
