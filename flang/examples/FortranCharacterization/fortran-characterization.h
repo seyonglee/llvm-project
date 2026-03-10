@@ -78,6 +78,8 @@ public:
 
   static std::unordered_set<std::string> optional_dummy_arguments;
 
+  static std::unordered_set<std::string> executable_constructs;
+
   static bool use_iso_Fortran_env;
 
   static bool is_in_c_binding_procedure;
@@ -242,13 +244,37 @@ public:
   // - Finding a unit when opening a file (newunit=u)
   void Post(const parser::ConnectSpec::Newunit &);
   // - The BLOCK construct
+  // - Exit statement allowed in almost any construct
   void Post(const parser::BlockStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::EndBlockStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::IfThenStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::EndIfStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::AssociateStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::EndAssociateStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::WhereConstructStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::EndWhereStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::SelectCaseStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::SelectTypeStmt &);
+  // - Exit statement allowed in almost any construct
+  // - SELECT RANK (Fortran 2018)
+  void Post(const parser::SelectRankStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::EndSelectStmt &);
+  // - Exit statement allowed in almost any construct
+  void Post(const parser::ExitStmt &);
 
   /////////////////////////////////
   // Fortran 2018's New Features //
   /////////////////////////////////
-  // - SELECT RANK
-  void Post(const parser::SelectRankStmt &);
   // - Assumed-size arrays
   void Post(const parser::AssumedSizeSpec &);
   // - Assumed-size arrays

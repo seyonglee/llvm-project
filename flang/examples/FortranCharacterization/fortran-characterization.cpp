@@ -167,6 +167,11 @@ std::unordered_set<std::string>
 std::unordered_set<std::string>
     FeatureCharacterization::optional_dummy_arguments;
 
+// Fortran 2008 allows the following executable constructs to have an exit
+// statement, in addition to DO: IF, SELECT CASE, SELECT RANK, SELECT TYPE,
+// ASSOCIATE, BLOCK, WHERE
+std::unordered_set<std::string> FeatureCharacterization::executable_constructs;
+
 bool FeatureCharacterization::use_iso_Fortran_env = false;
 
 bool FeatureCharacterization::is_in_c_binding_procedure = false;
@@ -1302,15 +1307,110 @@ void FeatureCharacterization::Post(const parser::ConcurrentHeader &ch) {
 void FeatureCharacterization::Post(const parser::ConnectSpec::Newunit &) {
   features["Finding a unit when opening a file (newunit=u)"] = true;
 }
-void FeatureCharacterization::Post(const parser::BlockStmt &) {
+void FeatureCharacterization::Post(const parser::BlockStmt &bs) {
   features["The BLOCK construct"] = true;
+  if (bs.v.has_value()) {
+    const auto &blockName{bs.v.value()};
+    CONVERT2LOWERCASE(blockName.ToString(), blockNameString);
+    executable_constructs.insert(blockNameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::EndBlockStmt &ebs) {
+  if (ebs.v.has_value()) {
+    const auto &blockName{ebs.v.value()};
+    CONVERT2LOWERCASE(blockName.ToString(), blockNameString);
+    executable_constructs.erase(blockNameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::IfThenStmt &its) {
+  const auto &ifConstructName{std::get<std::optional<parser::Name>>(its.t)};
+  if (ifConstructName.has_value()) {
+    const auto &name{ifConstructName.value()};
+    CONVERT2LOWERCASE(name.ToString(), nameString);
+    executable_constructs.insert(nameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::EndIfStmt &eifs) {
+  if (eifs.v.has_value()) {
+    const auto &ifConstructName{eifs.v.value()};
+    CONVERT2LOWERCASE(ifConstructName.ToString(), ifConstructNameString);
+    executable_constructs.erase(ifConstructNameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::AssociateStmt &as) {
+  const auto &associateStmtName{std::get<std::optional<parser::Name>>(as.t)};
+  if (associateStmtName.has_value()) {
+    const auto &name{associateStmtName.value()};
+    CONVERT2LOWERCASE(name.ToString(), nameString);
+    executable_constructs.insert(nameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::EndAssociateStmt &eas) {
+  if (eas.v.has_value()) {
+    const auto &associateStmtName{eas.v.value()};
+    CONVERT2LOWERCASE(associateStmtName.ToString(), nameString);
+    executable_constructs.erase(nameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::WhereConstructStmt &wcs) {
+  const auto &whereConstructName{std::get<std::optional<parser::Name>>(wcs.t)};
+  if (whereConstructName.has_value()) {
+    const auto &name{whereConstructName.value()};
+    CONVERT2LOWERCASE(name.ToString(), nameString);
+    executable_constructs.insert(nameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::EndWhereStmt &ews) {
+  if (ews.v.has_value()) {
+    const auto &whereConstructName{ews.v.value()};
+    CONVERT2LOWERCASE(whereConstructName.ToString(), nameString);
+    executable_constructs.erase(nameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::SelectCaseStmt &scs) {
+  const auto &constructName{std::get<std::optional<parser::Name>>(scs.t)};
+  if (constructName.has_value()) {
+    const auto &name{constructName.value()};
+    CONVERT2LOWERCASE(name.ToString(), nameString);
+    executable_constructs.insert(nameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::SelectTypeStmt &sts) {
+  const auto &constructName = std::get<0>(sts.t);
+  if (constructName.has_value()) {
+    const auto &name{constructName.value()};
+    CONVERT2LOWERCASE(name.ToString(), nameString);
+    executable_constructs.insert(nameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::EndSelectStmt &ess) {
+  if (ess.v.has_value()) {
+    const auto &constructName{ess.v.value()};
+    CONVERT2LOWERCASE(constructName.ToString(), nameString);
+    executable_constructs.erase(nameString);
+  }
+}
+void FeatureCharacterization::Post(const parser::ExitStmt &es) {
+  if (es.v.has_value()) {
+    const auto &constructName{es.v.value()};
+    CONVERT2LOWERCASE(constructName.ToString(), nameString);
+    if (executable_constructs.find(nameString) != executable_constructs.end()) {
+      features["Exit statement allowed in almost any construct"] = true;
+    }
+  }
 }
 
 /////////////////////////////////
 // Fortran 2018's New Features //
 /////////////////////////////////
-void FeatureCharacterization::Post(const parser::SelectRankStmt &) {
+void FeatureCharacterization::Post(const parser::SelectRankStmt &srs) {
   features["SELECT RANK"] = true;
+  const auto &constructName = std::get<0>(srs.t);
+  if (constructName.has_value()) {
+    const auto &name{constructName.value()};
+    CONVERT2LOWERCASE(name.ToString(), nameString);
+    executable_constructs.insert(nameString);
+  }
 }
 void FeatureCharacterization::Post(const parser::AssumedSizeSpec &) {
   features["Assumed-size arrays"] = true;
@@ -1622,7 +1722,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Unlimited format item");
   // checkMap("Recursive I/O for an external unit");
   checkMap("The BLOCK construct");
-  // checkMap("Exit statement allowed in almost any construct");
+  checkMap("Exit statement allowed in almost any construct");
   // checkMap("STOP code");
   // checkMap("Bit sequence comparison");
   // checkMap("Combined shifting");
