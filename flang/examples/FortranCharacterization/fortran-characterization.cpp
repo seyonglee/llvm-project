@@ -1483,6 +1483,13 @@ void FeatureCharacterization::Post(const parser::AssignmentStmt &as) {
     const auto &designator{dsn->value()};
     if (const auto *dr{std::get_if<parser::DataRef>(&designator.u)}) {
       if (const auto *name{std::get_if<parser::Name>(&dr->u)}) {
+        if (name->symbol) {
+          if (name->symbol->attrs().test(semantics::Attr::ALLOCATABLE)) {
+            features["Assignment to an allocatable array"] = true;
+          }
+        } else {
+          out_ << "==> No symbol found for " << name->ToString() << "\n";
+        }
         CONVERT2LOWERCASE(name->ToString(), nameString);
         if (pure_value_dummy_arguments.find(nameString) !=
             pure_value_dummy_arguments.end()) {
@@ -1600,6 +1607,71 @@ void FeatureCharacterization::Post(const parser::WriteStmt &ws) {
 ///////////////////////
 // Utility Functions //
 ///////////////////////
+std::string FeatureCharacterization::SymbolKindString(
+    const semantics::Symbol *sym) {
+  if (semantics::IsFunction(*sym)) {
+    return "function";
+  }
+  if (semantics::IsProcedure(*sym)) {
+    return "procedure";
+  }
+  /*
+  if (semantics::IsSubroutine(*sym)) {
+    return "subroutine";
+  }
+  if (semantics::IsObjectEntity(*sym)) {
+    return "object";
+  }
+  if (semantics::IsDerivedType(*sym)) {
+    return "derived-type";
+  }
+  if (semantics::IsTypeParam(*sym)) {
+    return "type-param";
+  }
+    */
+  if (semantics::IsNamedConstant(*sym)) {
+    return "named-constant";
+  }
+  return "symbol";
+}
+
+void FeatureCharacterization::DumpSymbol(const semantics::Symbol *sym) {
+  out_ << "resolved-symbol: " << sym->name().ToString()
+       << " kind=" << SymbolKindString(sym);
+
+  if (const semantics::DeclTypeSpec *type = sym->GetType()) {
+    out_ << " has-type";
+    // Depending on your LLVM/Flang revision, you may have a better type
+    // printer. Keeping this conservative makes the skeleton more portable.
+    (void)type;
+  } else {
+    out_ << " no-declared-type";
+  }
+
+  if (sym->attrs().test(semantics::Attr::POINTER)) {
+    out_ << " POINTER";
+  }
+  if (sym->attrs().test(semantics::Attr::ALLOCATABLE)) {
+    out_ << " ALLOCATABLE";
+  }
+  if (sym->attrs().test(semantics::Attr::OPTIONAL)) {
+    out_ << " OPTIONAL";
+  }
+  if (sym->attrs().test(semantics::Attr::TARGET)) {
+    out_ << " TARGET";
+  }
+  if (sym->attrs().test(semantics::Attr::INTENT_IN)) {
+    out_ << " INTENT(IN)";
+  }
+  if (sym->attrs().test(semantics::Attr::INTENT_OUT)) {
+    out_ << " INTENT(OUT)";
+  }
+  if (sym->attrs().test(semantics::Attr::INTENT_INOUT)) {
+    out_ << " INTENT(INOUT)";
+  }
+
+  out_ << "\n";
+}
 
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
@@ -1654,7 +1726,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("The allocate statement (allocate with SOURCE)");
   checkMap("Allocatable scalars"); // Semantics
   checkMap("Allocatable character length"); // Semantics
-  // checkMap("Assignment to an allocatable array");
+  checkMap("Assignment to an allocatable array");
   // checkMap("Transferring an allocation");
   checkMap("More control of access from a module");
   checkMap("Renaming operators on the USE statement");

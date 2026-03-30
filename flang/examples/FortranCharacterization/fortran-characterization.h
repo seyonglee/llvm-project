@@ -25,6 +25,9 @@
 #include "flang/Parser/parsing.h"
 #include "flang/Parser/tools.h"
 #include "flang/Parser/unparse.h"
+#include "flang/Semantics/semantics.h"
+#include "flang/Semantics/symbol.h"
+#include "flang/Semantics/tools.h"
 #include "flang/Support/Fortran.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
@@ -55,6 +58,8 @@ public:
 
   void checkMap(const char *key, bool addComma = true);
   void setMap(const char *key, bool val);
+  std::string SymbolKindString(const semantics::Symbol *sym);
+  void DumpSymbol(const semantics::Symbol *sym);
 
   template <typename T> bool Pre(const T &x) { return true; }
 
@@ -296,6 +301,7 @@ public:
   // - Default accessibility for entities accessed from a module
   void Post(const parser::AccessStmt &);
   // - Removal of anomalies regarding pure procedures
+  // - Assignment to an allocatable array (Fortran 2003)
   void Post(const parser::AssignmentStmt &);
   // - Removal of anomalies regarding pure procedures
   void Post(const parser::ReadStmt &);
@@ -379,9 +385,8 @@ class FeatureListAction : public PluginParseTreeAction {
   // don't need to override beginSourceFileAction because it already does
   // what we want
   bool beginSourceFileAction() override {
-    return runPrescan() &&
-        runParse(/*emitMessages=*/true); // &&
-                                         // runSemanticChecks();
+    return runPrescan() && runParse(/*emitMessages=*/true) &&
+        runSemanticChecks();
   }
 };
 
