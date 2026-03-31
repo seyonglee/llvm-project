@@ -4,6 +4,7 @@
 // attributes of interest
 #include "fortran-characterization.h"
 #include "flang/Common/indirection.h"
+#include "flang/Evaluate/tools.h"
 #include "flang/Parser/parse-tree.h"
 #include <iostream>
 #include <unordered_set>
@@ -802,11 +803,29 @@ void FeatureCharacterization::Post(const parser::UseStmt &us) {
   used_modules.insert(modString);
 }
 void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
+  const auto &tExpr{std::get<Expr>(pas.t)};
   const auto &bounds{std::get<PointerAssignmentStmt::Bounds>(pas.t)};
   if (const auto *const brList{
           std::get_if<std::list<BoundsRemapping>>(&bounds.u)}) {
     if (!brList->empty()) {
       features["Pointer assignment (rank remapping)"] = true;
+    }
+  }
+  if (const auto *const dsn{std::get_if<Indirection<Designator>>(&tExpr.u)}) {
+    if (const auto *const dref{std::get_if<DataRef>(&dsn->value().u)}) {
+      if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+        const auto &sym{tname->symbol};
+        if (sym) {
+          if (semantics::IsProcedure(*sym)) {
+            const Scope &scope = sym->owner();
+            if (!scope.IsModule() && !scope.IsGlobal()) {
+              features["Internal procedure as an actual argument"] = true;
+            }
+          }
+        } else {
+          out_ << "==> No symbol found for " << tname->ToString() << "\n";
+        }
+      }
     }
   }
 }
@@ -1087,6 +1106,32 @@ void FeatureCharacterization::Post(const parser::Call &c) {
   if (std::get_if<ProcComponentRef>(&pd.u)) {
     features["Procedures bound by name to a type (type-bound procedures)"] =
         true;
+  }
+  for (const auto &arg : actArgSpecs) {
+    const auto &argSpec = std::get<ActualArg>(arg.t);
+    if (const auto *argExprPtr =
+            std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+      const auto &argExpr = argExprPtr->value();
+      if (const auto *const dsn =
+              std::get_if<Indirection<Designator>>(&argExpr.u)) {
+        if (const auto *const dref = std::get_if<DataRef>(&dsn->value().u)) {
+          if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+            auto *sym = tname->symbol;
+            if (sym) {
+              if (semantics::IsProcedure(*sym)) {
+                const Scope &scope = sym->owner();
+                if (!scope.IsModule() && !scope.IsGlobal()) {
+                  features["Internal procedure as an actual argument"] = true;
+                  break;
+                }
+              }
+            } else {
+              out_ << "==> No symbol found for " << tname->ToString() << "\n";
+            }
+          }
+        }
+      }
+    }
   }
 }
 void FeatureCharacterization::Post(const parser::IoControlSpec &iocs) {
@@ -1819,7 +1864,8 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Save attribute for module and submodule data");
   // checkMap("Empty contains part");
   // checkMap("Form of the end statement for an internal or module
-  // procedure"); checkMap("Internal procedure as an actual argument");
+  // procedure");
+  checkMap("Internal procedure as an actual argument");
   // checkMap(
   //    "Null pointer or unallocated allocatable as an absent dummy
   //    argument");
