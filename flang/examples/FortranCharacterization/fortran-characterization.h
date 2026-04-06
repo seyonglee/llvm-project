@@ -201,6 +201,7 @@ public:
   // - Removal of the restriction on argument dim of many intrinsic functions
   // (Fortran 2018)
   // - Internal procedure as an actual argument
+  // - Overriding a type-bound procedure
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);

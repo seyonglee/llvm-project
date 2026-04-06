@@ -6,6 +6,7 @@
 #include "flang/Common/indirection.h"
 #include "flang/Evaluate/tools.h"
 #include "flang/Parser/parse-tree.h"
+#include "flang/Semantics/tools.h"
 #include <iostream>
 #include <unordered_set>
 #include <variant>
@@ -1103,7 +1104,13 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       }
     }
   }
-  if (std::get_if<ProcComponentRef>(&pd.u)) {
+  if (const auto *procCompRef{std::get_if<ProcComponentRef>(&pd.u)}) {
+    const auto *typeBoundProcSym{procCompRef->v.thing.component.symbol};
+    bool isInaccessibleDeferred{false};
+    if (semantics::FindOverriddenBinding(
+            *typeBoundProcSym, isInaccessibleDeferred)) {
+      features["Overriding a type-bound procedure"] = true;
+    }
     features["Procedures bound by name to a type (type-bound procedures)"] =
         true;
   }
@@ -1761,7 +1768,8 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Procedures bound to a type as operators");
   checkMap("Type extension");
   // discuss why we need semantics here and why we won't be including it
-  // anymore checkMap("Overriding a type-bound procedure");
+  // anymore
+  checkMap("Overriding a type-bound procedure");
   checkMap("Enumerations");
   checkMap("ASSOCIATE construct");
   checkMap("Polymorphic entities");
