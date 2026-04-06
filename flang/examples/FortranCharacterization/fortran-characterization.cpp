@@ -976,12 +976,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
         fnName == "sum" || fnName == "maxloc" || fnName == "minloc") {
       if (actArgSpecs.size() > 1) {
         int tIndex = 0;
-        bool keyword_used = false;
         bool found_dim = false;
         for (const auto &arg : actArgSpecs) {
           const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
           if (optKeyword.has_value()) {
-            keyword_used = true;
             CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
             if (kw == "dim") {
               found_dim = true;
@@ -992,7 +990,31 @@ void FeatureCharacterization::Post(const parser::Call &c) {
               }
             }
           } else {
-            keyword_used = false;
+            if (tIndex == 1) {
+              const auto &actArg = std::get<ActualArg>(arg.t);
+              if (const auto *argExprPtr =
+                      std::get_if<common::Indirection<Expr>>(&actArg.u)) {
+                const auto &argExpr = argExprPtr->value();
+                if (const auto *const dsn =
+                        std::get_if<Indirection<Designator>>(&argExpr.u)) {
+                  if (const auto *const dref =
+                          std::get_if<DataRef>(&dsn->value().u)) {
+                    if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                      if (tname->symbol) {
+                        const semantics::Symbol *sym = tname->symbol;
+                        if (const semantics::DeclTypeSpec *type =
+                                sym->GetType()) {
+                          if (type->category() ==
+                              DeclTypeSpec::Category::Numeric) {
+                            found_dim = true;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
             if (fnName == "maxloc" || fnName == "minloc") {
               if (tIndex == 4) {
                 features["Optional back argument added to maxloc and minloc"] =
@@ -1026,9 +1048,6 @@ void FeatureCharacterization::Post(const parser::Call &c) {
               }
             }
           }
-          //[FIXME] If keyword is not used, we need to check the type of the
-          // second argument to see whether it is dim or not.
-          // if (found_dim || (!keyword_used && (tIndex == 1)))
           if (found_dim) {
             const auto &argSpec = std::get<ActualArg>(arg.t);
             if (const auto *argExprPtr =
@@ -1057,22 +1076,41 @@ void FeatureCharacterization::Post(const parser::Call &c) {
     } else if (fnName == "findloc") {
       if (actArgSpecs.size() > 2) {
         int tIndex = 0;
-        bool keyword_used = false;
         bool found_dim = false;
         for (const auto &arg : actArgSpecs) {
           const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
           if (optKeyword.has_value()) {
-            keyword_used = true;
             CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
             if (kw == "dim") {
               found_dim = true;
             }
           } else {
-            keyword_used = false;
+            if (tIndex == 2) {
+              const auto &actArg = std::get<ActualArg>(arg.t);
+              if (const auto *argExprPtr =
+                      std::get_if<common::Indirection<Expr>>(&actArg.u)) {
+                const auto &argExpr = argExprPtr->value();
+                if (const auto *const dsn =
+                        std::get_if<Indirection<Designator>>(&argExpr.u)) {
+                  if (const auto *const dref =
+                          std::get_if<DataRef>(&dsn->value().u)) {
+                    if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                      if (tname->symbol) {
+                        const semantics::Symbol *sym = tname->symbol;
+                        if (const semantics::DeclTypeSpec *type =
+                                sym->GetType()) {
+                          if (type->category() ==
+                              DeclTypeSpec::Category::Numeric) {
+                            found_dim = true;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
-          //[FIXME] If keyword is not used, we need to check the type of the
-          // third argument to see whether it is dim or not.
-          // if (found_dim || (!keyword_used && (tIndex == 2)))
           if (found_dim) {
             const auto &argSpec = std::get<ActualArg>(arg.t);
             if (const auto *argExprPtr =
