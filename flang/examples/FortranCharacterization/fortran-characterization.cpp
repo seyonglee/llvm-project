@@ -998,10 +998,31 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                 features["Optional back argument added to maxloc and minloc"] =
                     true;
               } else if (tIndex == 3) {
-                //[FIXME] If this is the last argument and its type is logical,
-                // then it is the back argument.
-                // features["Optional back argument added to maxloc and minloc"]
-                // = true;
+                const auto &actArg = std::get<ActualArg>(arg.t);
+                if (const auto *argExprPtr =
+                        std::get_if<common::Indirection<Expr>>(&actArg.u)) {
+                  const auto &argExpr = argExprPtr->value();
+                  if (const auto *const dsn =
+                          std::get_if<Indirection<Designator>>(&argExpr.u)) {
+                    if (const auto *const dref =
+                            std::get_if<DataRef>(&dsn->value().u)) {
+                      if (const auto *const tname{
+                              std::get_if<Name>(&dref->u)}) {
+                        if (tname->symbol) {
+                          const semantics::Symbol *sym = tname->symbol;
+                          if (const semantics::DeclTypeSpec *type =
+                                  sym->GetType()) {
+                            if (type->category() ==
+                                DeclTypeSpec::Category::Logical) {
+                              features["Optional back argument added to maxloc "
+                                       "and minloc"] = true;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -1029,7 +1050,6 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                 }
               }
             }
-            break;
           }
           tIndex++;
         }
