@@ -58,8 +58,9 @@ public:
 
   void checkMap(const char *key, bool addComma = true);
   void setMap(const char *key, bool val);
-  std::string SymbolKindString(const semantics::Symbol *sym);
-  void DumpSymbol(const semantics::Symbol *sym);
+  std::string symbolKindString(const semantics::Symbol *sym);
+  void dumpSymbol(const semantics::Symbol *sym);
+  std::string dumpExactVariableType(const Symbol *sym);
 
   template <typename T> bool Pre(const T &x) { return true; }
 
@@ -132,8 +133,6 @@ public:
   // - Procedures bound by name to a type (type-bound procedures)
   // void Post(const parser::TypeBoundProcBinding &node);
   void Post(const parser::Pass &);
-  // - procedures bound to a type as operators
-  void Post(const parser::TypeBoundGenericStmt &);
   // - type extension and abstract types
   void Post(const parser::TypeAttrSpec &);
   // - Enumerations
@@ -205,6 +204,7 @@ public:
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
+  // - procedures bound to a type as operators
   // - The value attribute for an argument of a defined operation or assignment
   // (Fortran 2018)
   void Post(const parser::TypeBoundProcBinding &tbpb);
@@ -279,6 +279,8 @@ public:
   void Post(const parser::EndSelectStmt &);
   // - Exit statement allowed in almost any construct
   void Post(const parser::ExitStmt &);
+  // - Generic resolution by pointer vs. allocatable
+  void Post(const parser::GenericSpec &);
 
   /////////////////////////////////
   // Fortran 2018's New Features //

@@ -6,8 +6,9 @@
 #include "flang/Common/indirection.h"
 #include "flang/Evaluate/tools.h"
 #include "flang/Parser/parse-tree.h"
+#include "flang/Semantics/symbol.h"
 #include "flang/Semantics/tools.h"
-#include <iostream>
+#include "flang/Semantics/type.h"
 #include <unordered_set>
 #include <variant>
 #include <vector>
@@ -295,14 +296,6 @@ void FeatureCharacterization::Post(const parser::FinalProcedureStmt &node) {
 }
 void FeatureCharacterization::Post(const parser::Pass &) {
   features["The PASS attribute"] = true;
-}
-void FeatureCharacterization::Post(const parser::TypeBoundGenericStmt &tbgs) {
-  const auto &genericSpec{std::get<Indirection<GenericSpec>>(tbgs.t)};
-  if (std::get_if<parser::DefinedOperator>(&genericSpec.value().u)) {
-    features["Procedures bound to a type as operators"] = true;
-  } else if (std::get_if<GenericSpec::Assignment>(&genericSpec.value().u)) {
-    features["Procedures bound to a type as operators"] = true;
-  }
 }
 void FeatureCharacterization::Post(const parser::TypeAttrSpec &tas) {
   if (std::get_if<parser::TypeAttrSpec::Extends>(&tas.u)) {
@@ -824,7 +817,8 @@ void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
             }
           }
         } else {
-          out_ << "==> No symbol found for " << tname->ToString() << "\n";
+          out_ << "==> [Error on PointerAssignmentStmt] No symbol found for "
+               << tname->ToString() << "\n";
         }
       }
     }
@@ -1191,7 +1185,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                 }
               }
             } else {
-              out_ << "==> No symbol found for " << tname->ToString() << "\n";
+              out_ << "==> [Error on actArgSpecs of Call] No symbol found for "
+                   << tname->ToString() << "\n";
             }
           }
         }
@@ -1225,6 +1220,7 @@ void FeatureCharacterization::Post(const parser::TypeBoundProcBinding &tbpb) {
     const auto &genericSpec{std::get<Indirection<GenericSpec>>(tbgs->t)};
     if (const auto *definedOp{
             std::get_if<parser::DefinedOperator>(&genericSpec.value().u)}) {
+      features["Procedures bound to a type as operators"] = true;
       if (std::get_if<parser::DefinedOperator::IntrinsicOperator>(
               &(definedOp->u))) {
         const auto fNameList{std::get<std::list<parser::Name>>(tbgs->t)};
@@ -1235,6 +1231,7 @@ void FeatureCharacterization::Post(const parser::TypeBoundProcBinding &tbpb) {
       }
     } else if (std::get_if<parser::GenericSpec::Assignment>(
                    &genericSpec.value().u)) {
+      features["Procedures bound to a type as operators"] = true;
       const auto fNameList{std::get<std::list<parser::Name>>(tbgs->t)};
       for (const auto &name : fNameList) {
         CONVERT2LOWERCASE(name.ToString(), nameString);
@@ -1509,6 +1506,60 @@ void FeatureCharacterization::Post(const parser::ExitStmt &es) {
     }
   }
 }
+void FeatureCharacterization::Post(const parser::GenericSpec &gs) {
+  if (const auto *name{std::get_if<parser::Name>(&gs.u)}) {
+    CONVERT2LOWERCASE(name->ToString(), nameString);
+    if (const Symbol *sym = name->symbol) {
+      // Each generic symbol has GenericDetails, which has a list of specific
+      // procedures. Each specific procedure symbol has SubprogramDetails, which
+      // has a list of dummy arguments. Each dummy argument symbol has
+      // ObjectEntityDetails.
+      if (const auto *generic{sym->detailsIf<GenericDetails>()}) {
+        std::vector<std::string> specificProcSignatures;
+        const auto specificProcs = generic->specificProcs();
+        for (const auto &proc : specificProcs) {
+          std::string argTypeStr("");
+          const Symbol pSym = proc.get();
+          const auto *subProgramDetails{
+              pSym.detailsIf<semantics::SubprogramDetails>()};
+          if (subProgramDetails) {
+            const auto dummyArgs = subProgramDetails->dummyArgs();
+            for (const auto *argSym : dummyArgs) {
+              argTypeStr += dumpExactVariableType(argSym);
+            }
+          }
+          specificProcSignatures.push_back(argTypeStr);
+        }
+        std::unordered_set<std::string> seen;
+        int i = 0;
+        bool genProcFound = false;
+        for (const std::string &str : specificProcSignatures) {
+          if (!seen.insert(str).second) {
+            const auto &proc{specificProcs[i]};
+            const Symbol pSym = proc.get();
+            const auto *subProgramDetails{
+                pSym.detailsIf<semantics::SubprogramDetails>()};
+            if (subProgramDetails) {
+              const auto dummyArgs = subProgramDetails->dummyArgs();
+              for (const auto *argSym : dummyArgs) {
+                if (argSym->attrs().test(semantics::Attr::ALLOCATABLE) ||
+                    argSym->attrs().test(semantics::Attr::POINTER)) {
+                  genProcFound = true;
+                  break;
+                }
+              }
+            }
+            if (genProcFound) {
+              features["Generic resolution by pointer vs. allocatable"] = true;
+              break;
+            }
+          }
+          i++;
+        }
+      }
+    }
+  }
+}
 
 /////////////////////////////////
 // Fortran 2018's New Features //
@@ -1598,7 +1649,8 @@ void FeatureCharacterization::Post(const parser::AssignmentStmt &as) {
             features["Assignment to an allocatable array"] = true;
           }
         } else {
-          out_ << "==> No symbol found for " << name->ToString() << "\n";
+          out_ << "==> [Error on AssignmentStmt] No symbol found for "
+               << name->ToString() << "\n";
         }
         CONVERT2LOWERCASE(name->ToString(), nameString);
         if (pure_value_dummy_arguments.find(nameString) !=
@@ -1717,7 +1769,7 @@ void FeatureCharacterization::Post(const parser::WriteStmt &ws) {
 ///////////////////////
 // Utility Functions //
 ///////////////////////
-std::string FeatureCharacterization::SymbolKindString(
+std::string FeatureCharacterization::symbolKindString(
     const semantics::Symbol *sym) {
   if (semantics::IsFunction(*sym)) {
     return "function";
@@ -1745,9 +1797,9 @@ std::string FeatureCharacterization::SymbolKindString(
   return "symbol";
 }
 
-void FeatureCharacterization::DumpSymbol(const semantics::Symbol *sym) {
+void FeatureCharacterization::dumpSymbol(const semantics::Symbol *sym) {
   out_ << "resolved-symbol: " << sym->name().ToString()
-       << " kind=" << SymbolKindString(sym);
+       << " kind=" << symbolKindString(sym);
 
   if (const semantics::DeclTypeSpec *type = sym->GetType()) {
     out_ << " has-type";
@@ -1781,6 +1833,67 @@ void FeatureCharacterization::DumpSymbol(const semantics::Symbol *sym) {
   }
 
   out_ << "\n";
+}
+
+std::string FeatureCharacterization::dumpExactVariableType(const Symbol *sym) {
+  const Symbol &ultimate{sym->GetUltimate()};
+  std::string symTypeString;
+  std::string symArraySpecString("");
+
+  const semantics::ArraySpec *arraySpec{ultimate.GetShape()};
+  if (arraySpec) {
+    symArraySpecString += arraySpec->Rank() == 0
+        ? "scalar"
+        : "array" + std::to_string(arraySpec->Rank()) + "D";
+  }
+
+  const DeclTypeSpec *type{ultimate.GetType()};
+  if (!type) {
+    symTypeString = "no-declared-type";
+    return symTypeString;
+  }
+
+  switch (type->category()) {
+  case DeclTypeSpec::Numeric: {
+    const auto &intr{*type->AsIntrinsic()};
+    symTypeString = intr.AsFortran();
+    break;
+  }
+
+  case DeclTypeSpec::Logical: {
+    const auto &intr{*type->AsIntrinsic()};
+    symTypeString = "logical(kind=" + intr.kind().AsFortran() + ")";
+    break;
+  }
+
+  case DeclTypeSpec::Character: {
+    const auto &ch{type->characterTypeSpec()};
+    symTypeString = "character(kind=" + ch.kind().AsFortran() +
+        ", len=" + ch.length().AsFortran() + ")";
+    break;
+  }
+
+  case DeclTypeSpec::TypeDerived: {
+    const semantics::DerivedTypeSpec &dt{type->derivedTypeSpec()};
+    symTypeString = "type(" + dt.name().ToString() + ")";
+    break;
+  }
+
+  case DeclTypeSpec::ClassDerived: {
+    const semantics::DerivedTypeSpec &dt{type->derivedTypeSpec()};
+    symTypeString = "class(" + dt.name().ToString() + ")";
+    break;
+  }
+
+  case DeclTypeSpec::TypeStar:
+    llvm::outs() << "type(*)\n";
+    break;
+
+  case DeclTypeSpec::ClassStar:
+    llvm::outs() << "class(*)\n";
+    break;
+  }
+  return symTypeString + symArraySpecString;
 }
 
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
@@ -1938,7 +2051,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Non-pointer actual for pointer dummy argument");
   checkMap("Impure elemental procedures");
   // checkMap("Generic resolution by procedureness");
-  // checkMap("Generic resolution by pointer vs. allocatable");
+  checkMap("Generic resolution by pointer vs. allocatable");
   out_ << "}\n";
 
   out_ << "Fortran 2018's New Features {\n";
