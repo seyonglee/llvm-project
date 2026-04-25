@@ -1513,7 +1513,7 @@ void FeatureCharacterization::Post(const parser::GenericSpec &gs) {
       // Each generic symbol has GenericDetails, which has a list of specific
       // procedures. Each specific procedure symbol has SubprogramDetails, which
       // has a list of dummy arguments. Each dummy argument symbol has
-      // ObjectEntityDetails.
+      // ObjectEntityDetails, ProcedureDetails, or SubprogramDetails.
       if (const auto *generic{sym->detailsIf<GenericDetails>()}) {
         std::vector<std::string> specificProcSignatures;
         const auto specificProcs = generic->specificProcs();
@@ -1525,14 +1525,19 @@ void FeatureCharacterization::Post(const parser::GenericSpec &gs) {
           if (subProgramDetails) {
             const auto dummyArgs = subProgramDetails->dummyArgs();
             for (const auto *argSym : dummyArgs) {
-              argTypeStr += dumpExactVariableType(argSym);
+              argTypeStr += dumpExactSymbolType(argSym);
+              if (argSym->IsSubprogram()) {
+                features["Generic resolution by procedureness"] = true;
+              } else if (argSym->has<semantics::ProcEntityDetails>()) {
+                features["Generic resolution by procedureness"] = true;
+              }
             }
           }
           specificProcSignatures.push_back(argTypeStr);
         }
         std::unordered_set<std::string> seen;
         int i = 0;
-        bool genProcFound = false;
+        bool genResolByAttr = false;
         for (const std::string &str : specificProcSignatures) {
           if (!seen.insert(str).second) {
             const auto &proc{specificProcs[i]};
@@ -1544,12 +1549,12 @@ void FeatureCharacterization::Post(const parser::GenericSpec &gs) {
               for (const auto *argSym : dummyArgs) {
                 if (argSym->attrs().test(semantics::Attr::ALLOCATABLE) ||
                     argSym->attrs().test(semantics::Attr::POINTER)) {
-                  genProcFound = true;
+                  genResolByAttr = true;
                   break;
                 }
               }
             }
-            if (genProcFound) {
+            if (genResolByAttr) {
               features["Generic resolution by pointer vs. allocatable"] = true;
               break;
             }
@@ -1835,22 +1840,41 @@ void FeatureCharacterization::dumpSymbol(const semantics::Symbol *sym) {
   out_ << "\n";
 }
 
-std::string FeatureCharacterization::dumpExactVariableType(const Symbol *sym) {
+std::string FeatureCharacterization::dumpExactSymbolType(const Symbol *sym) {
   const Symbol &ultimate{sym->GetUltimate()};
   std::string symTypeString;
-  std::string symArraySpecString("");
+  std::string symTypePrefixString("");
 
-  const semantics::ArraySpec *arraySpec{ultimate.GetShape()};
-  if (arraySpec) {
-    symArraySpecString += arraySpec->Rank() == 0
-        ? "scalar"
-        : "array" + std::to_string(arraySpec->Rank()) + "D";
+  const auto *subProgramDetails{
+      ultimate.detailsIf<semantics::SubprogramDetails>()};
+  if (subProgramDetails) {
+    symTypeString = "subprogram";
+    std::string argTypeStr("");
+    const auto dummyArgs = subProgramDetails->dummyArgs();
+    for (const auto *argSym : dummyArgs) {
+      argTypeStr += dumpExactSymbolType(argSym);
+    }
+    symTypeString += argTypeStr;
+    return symTypeString;
+  }
+
+  const auto *procEntityDetails{
+      ultimate.detailsIf<semantics::ProcEntityDetails>()};
+  if (procEntityDetails) {
+    symTypePrefixString = "procEntity";
   }
 
   const DeclTypeSpec *type{ultimate.GetType()};
   if (!type) {
     symTypeString = "no-declared-type";
     return symTypeString;
+  }
+
+  const semantics::ArraySpec *arraySpec{ultimate.GetShape()};
+  if (arraySpec) {
+    symTypePrefixString += arraySpec->Rank() == 0
+        ? "scalar"
+        : "array" + std::to_string(arraySpec->Rank()) + "D";
   }
 
   switch (type->category()) {
@@ -1893,7 +1917,7 @@ std::string FeatureCharacterization::dumpExactVariableType(const Symbol *sym) {
     llvm::outs() << "class(*)\n";
     break;
   }
-  return symTypeString + symArraySpecString;
+  return symTypeString + symTypePrefixString;
 }
 
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
@@ -2050,7 +2074,7 @@ void FeatureCharacterization::checkAllFeatures() {
   //    argument");
   // checkMap("Non-pointer actual for pointer dummy argument");
   checkMap("Impure elemental procedures");
-  // checkMap("Generic resolution by procedureness");
+  checkMap("Generic resolution by procedureness");
   checkMap("Generic resolution by pointer vs. allocatable");
   out_ << "}\n";
 

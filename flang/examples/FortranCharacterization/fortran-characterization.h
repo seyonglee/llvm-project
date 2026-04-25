@@ -60,7 +60,7 @@ public:
   void setMap(const char *key, bool val);
   std::string symbolKindString(const semantics::Symbol *sym);
   void dumpSymbol(const semantics::Symbol *sym);
-  std::string dumpExactVariableType(const Symbol *sym);
+  std::string dumpExactSymbolType(const Symbol *sym);
 
   template <typename T> bool Pre(const T &x) { return true; }
 
