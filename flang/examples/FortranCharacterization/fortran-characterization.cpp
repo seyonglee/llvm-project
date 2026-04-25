@@ -128,6 +128,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Contiguous attribute for assumed-rank arrays", false},
     {"Default accessibility for entities accessed from a module", false},
     {"Implicit none enhancement", false},
+    {"Rules for generic procedures", false},
     {"Changes to Intrinsics that access the computing environment", false},
     {"New reduction intrinsic reduce", false},
     {"Intrinsic function coshape", false},
@@ -1515,6 +1516,7 @@ void FeatureCharacterization::Post(const parser::GenericSpec &gs) {
       // has a list of dummy arguments. Each dummy argument symbol has
       // ObjectEntityDetails, ProcedureDetails, or SubprogramDetails.
       if (const auto *generic{sym->detailsIf<GenericDetails>()}) {
+        std::unordered_set<int> dummyProcCounts;
         std::vector<std::string> specificProcSignatures;
         const auto specificProcs = generic->specificProcs();
         for (const auto &proc : specificProcs) {
@@ -1523,17 +1525,31 @@ void FeatureCharacterization::Post(const parser::GenericSpec &gs) {
           const auto *subProgramDetails{
               pSym.detailsIf<semantics::SubprogramDetails>()};
           if (subProgramDetails) {
+            int dummyProcCount = 0;
             const auto dummyArgs = subProgramDetails->dummyArgs();
             for (const auto *argSym : dummyArgs) {
+              bool isOptional = argSym->attrs().test(semantics::Attr::OPTIONAL);
+              bool isDummyProc = false;
               argTypeStr += dumpExactSymbolType(argSym);
               if (argSym->IsSubprogram()) {
                 features["Generic resolution by procedureness"] = true;
+                isDummyProc = true;
               } else if (argSym->has<semantics::ProcEntityDetails>()) {
                 features["Generic resolution by procedureness"] = true;
+                isDummyProc = true;
               }
+              if (!isOptional && isDummyProc) {
+                dummyProcCount++;
+              }
+            }
+            if (dummyProcCount > 0) {
+              dummyProcCounts.insert(dummyProcCount);
             }
           }
           specificProcSignatures.push_back(argTypeStr);
+        }
+        if (dummyProcCounts.size() > 1) {
+          features["Rules for generic procedures"] = true;
         }
         std::unordered_set<std::string> seen;
         int i = 0;
@@ -2089,6 +2105,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Contiguous attribute for assumed-rank arrays");
   checkMap("Default accessibility for entities accessed from a module");
   checkMap("Implicit none enhancement");
+  checkMap("Rules for generic procedures");
   checkMap("Changes to Intrinsics that access the computing environment");
   checkMap("New reduction intrinsic reduce");
   checkMap("Intrinsic function coshape");

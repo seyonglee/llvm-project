@@ -279,7 +279,9 @@ public:
   void Post(const parser::EndSelectStmt &);
   // - Exit statement allowed in almost any construct
   void Post(const parser::ExitStmt &);
+  // - Generic resolution by procedureness
   // - Generic resolution by pointer vs. allocatable
+  // - Rules for generic procedures (Fortran 2018)
   void Post(const parser::GenericSpec &);
 
   /////////////////////////////////
