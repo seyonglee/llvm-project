@@ -125,6 +125,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"The type CFI_dim_t", false}, {"Assumed rank", false},
     {"SELECT RANK", false}, {"Assumed-size arrays", false},
     {"Assumed type", false},
+    {"Allocatable dummy arguments of intent out", false},
     {"Contiguous attribute for assumed-rank arrays", false},
     {"Default accessibility for entities accessed from a module", false},
     {"Implicit none enhancement", false},
@@ -527,6 +528,7 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   bool assumedRankAttr{false};
   bool valueAttr{false};
   bool optionalAttr{false};
+  bool intentOutAttr{false};
   for (const parser::AttrSpec &attrSpec : attrSpecList) {
     if (std::holds_alternative<parser::Allocatable>(attrSpec.u)) {
       allocatableAttr = true;
@@ -589,6 +591,16 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
       }
     } else if (std::holds_alternative<parser::Optional>(attrSpec.u)) {
       optionalAttr = true;
+    } else if (std::holds_alternative<parser::IntentSpec>(attrSpec.u)) {
+      const auto &intentSpec = std::get<parser::IntentSpec>(attrSpec.u);
+      if (intentSpec.v == parser::IntentSpec::Intent::Out) {
+        intentOutAttr = true;
+      }
+    }
+  }
+  if (is_in_c_binding_procedure) {
+    if (allocatableAttr && intentOutAttr) {
+      features["Allocatable dummy arguments of intent out"] = true;
     }
   }
   if (saveAttr && targetAttr) {
@@ -2102,6 +2114,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("SELECT RANK");
   checkMap("Assumed-size arrays");
   checkMap("Assumed type");
+  checkMap("Allocatable dummy arguments of intent out");
   checkMap("Contiguous attribute for assumed-rank arrays");
   checkMap("Default accessibility for entities accessed from a module");
   checkMap("Implicit none enhancement");
