@@ -821,12 +821,24 @@ void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
   if (const auto *const dsn{std::get_if<Indirection<Designator>>(&tExpr.u)}) {
     if (const auto *const dref{std::get_if<DataRef>(&dsn->value().u)}) {
       if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
-        const auto &sym{tname->symbol};
+        const auto *sym{tname->symbol};
         if (sym) {
-          if (semantics::IsProcedure(*sym)) {
-            const Scope &scope = sym->owner();
-            if (!scope.IsModule() && !scope.IsGlobal()) {
-              features["Internal procedure as an actual argument"] = true;
+          const Symbol &ultimate{sym->GetUltimate()};
+          if (semantics::IsProcedure(ultimate)) {
+            const Scope &scope = ultimate.owner();
+            if (!scope.IsModule() && !scope.IsGlobal() &&
+                !scope.IsSubmodule()) {
+              if (ultimate.has<SubprogramDetails>()) {
+                const auto &subp = ultimate.get<SubprogramDetails>();
+                if (!subp.isInterface()) {
+                  features["Internal procedure as an actual argument"] = true;
+                }
+              } else if (ultimate.has<ProcEntityDetails>()) {
+                const auto &procEntity = ultimate.get<ProcEntityDetails>();
+                if (!procEntity.procInterface()) {
+                  features["Internal procedure as an actual argument"] = true;
+                }
+              }
             }
           }
         } else {
@@ -1190,11 +1202,29 @@ void FeatureCharacterization::Post(const parser::Call &c) {
           if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
             auto *sym = tname->symbol;
             if (sym) {
-              if (semantics::IsProcedure(*sym)) {
-                const Scope &scope = sym->owner();
-                if (!scope.IsModule() && !scope.IsGlobal()) {
-                  features["Internal procedure as an actual argument"] = true;
-                  break;
+              const Symbol &ultimate{sym->GetUltimate()};
+              if (semantics::IsProcedure(ultimate)) {
+                const Scope &scope = ultimate.owner();
+                if (!scope.IsModule() && !scope.IsGlobal() &&
+                    !scope.IsSubmodule()) {
+                  const auto scopeName = scope.GetName();
+                  if (scopeName.has_value()) {
+                    out_ << "==> scope of symbol for " << tname->ToString()
+                         << " is " << scopeName.value() << "\n";
+                  }
+                  if (ultimate.has<SubprogramDetails>()) {
+                    const auto &subp = ultimate.get<SubprogramDetails>();
+                    if (!subp.isInterface()) {
+                      features["Internal procedure as an actual argument"] =
+                          true;
+                    }
+                  } else if (ultimate.has<ProcEntityDetails>()) {
+                    const auto &procEntity = ultimate.get<ProcEntityDetails>();
+                    if (!procEntity.procInterface()) {
+                      features["Internal procedure as an actual argument"] =
+                          true;
+                    }
+                  }
                 }
               }
             } else {
