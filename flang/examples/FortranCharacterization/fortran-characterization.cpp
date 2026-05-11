@@ -5,6 +5,7 @@
 #include "fortran-characterization.h"
 #include "flang/Common/indirection.h"
 #include "flang/Evaluate/tools.h"
+#include "flang/Evaluate/type.h"
 #include "flang/Parser/parse-tree.h"
 #include "flang/Semantics/symbol.h"
 #include "flang/Semantics/tools.h"
@@ -12,6 +13,8 @@
 #include <unordered_set>
 #include <variant>
 #include <vector>
+
+#define PRINT_DEBUG_INFO 1
 
 // Convert inputString to lowercases and store in a variable lName
 #define CONVERT2LOWERCASE(inputString, lName) \
@@ -122,9 +125,10 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Generic resolution by pointer vs. allocatable", false},
     /* Fortran 2018's New Features */
     {"C descriptors", false}, {"Attribute codes", false},
-    {"The type CFI_dim_t", false}, {"Assumed rank", false},
-    {"SELECT RANK", false}, {"Assumed-size arrays", false},
-    {"Assumed type", false},
+    {"The type CFI_dim_t", false},
+    {"Changes to procedures in the iso_c_binding module", false},
+    {"Assumed rank", false}, {"SELECT RANK", false},
+    {"Assumed-size arrays", false}, {"Assumed type", false},
     {"Allocatable dummy arguments of intent out", false},
     {"Contiguous attribute for assumed-rank arrays", false},
     {"Default accessibility for entities accessed from a module", false},
@@ -760,7 +764,6 @@ void FeatureCharacterization::Post(
         name.symbol ? &name.symbol->GetUltimate() : nullptr};
     if (ultimate_) {
       if (ultimate_->Rank() == 0) {
-        out_ << name.ToString() << "\n";
         if (ultimate_->GetType()->category() ==
             DeclTypeSpec::Category::Character) {
           features["Allocatable character length"] = true;
@@ -842,8 +845,10 @@ void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
             }
           }
         } else {
+#if PRINT_DEBUG_INFO == 1
           out_ << "==> [Error on PointerAssignmentStmt] No symbol found for "
                << tname->ToString() << "\n";
+#endif
         }
       }
     }
@@ -1179,6 +1184,54 @@ void FeatureCharacterization::Post(const parser::Call &c) {
           break;
         }
       }
+      if ((fnName == "c_f_pointer") || (fnName == "c_loc") ||
+          (fnName == "c_f_procpointer") || (fnName == "c_funloc")) {
+        int argIndex = 0;
+        for (const auto &arg : actArgSpecs) {
+          const auto &argSpec = std::get<ActualArg>(arg.t);
+          if (const auto *argExprPtr =
+                  std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+            const auto &argExpr = argExprPtr->value();
+            if (const auto *const dsn =
+                    std::get_if<Indirection<Designator>>(&argExpr.u)) {
+              if (const auto *const dref =
+                      std::get_if<DataRef>(&dsn->value().u)) {
+                if (const auto *const tname{std::get_if<Name>(&dref->u)}) {
+                  auto *sym = tname->symbol;
+                  if (sym) {
+                    const Symbol &ultimate{sym->GetUltimate()};
+                    const auto &optKeyword =
+                        std::get<std::optional<Keyword>>(arg.t);
+                    bool is_cptr_or_fptr = false;
+                    if (optKeyword.has_value()) {
+                      CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
+                      if ((kw == "cptr") || (kw == "fptr")) {
+                        is_cptr_or_fptr = true;
+                      }
+                    } else if (argIndex <= 1) {
+                      is_cptr_or_fptr = true;
+                    }
+                    if (is_cptr_or_fptr) {
+                      if (semantics::IsProcedure(ultimate)) {
+                        if (!ultimate.attrs().test(semantics::Attr::BIND_C)) {
+                          features["Changes to procedures in the iso_c_binding "
+                                   "module"] = true;
+                          break;
+                        }
+                      } else if (!IsCInteroperableObject(ultimate)) {
+                        features["Changes to procedures in the iso_c_binding "
+                                 "module"] = true;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          argIndex++;
+        }
+      }
     }
   }
   if (const auto *procCompRef{std::get_if<ProcComponentRef>(&pd.u)}) {
@@ -1209,8 +1262,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                     !scope.IsSubmodule()) {
                   const auto scopeName = scope.GetName();
                   if (scopeName.has_value()) {
+#if PRINT_DEBUG_INFO == 1
                     out_ << "==> scope of symbol for " << tname->ToString()
                          << " is " << scopeName.value() << "\n";
+#endif
                   }
                   if (ultimate.has<SubprogramDetails>()) {
                     const auto &subp = ultimate.get<SubprogramDetails>();
@@ -1228,8 +1283,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                 }
               }
             } else {
+#if PRINT_DEBUG_INFO == 1
               out_ << "==> [Error on actArgSpecs of Call] No symbol found for "
                    << tname->ToString() << "\n";
+#endif
             }
           }
         }
@@ -1712,8 +1769,10 @@ void FeatureCharacterization::Post(const parser::AssignmentStmt &as) {
             features["Assignment to an allocatable array"] = true;
           }
         } else {
+#if PRINT_DEBUG_INFO == 1
           out_ << "==> [Error on AssignmentStmt] No symbol found for "
                << name->ToString() << "\n";
+#endif
         }
         CONVERT2LOWERCASE(name->ToString(), nameString);
         if (pure_value_dummy_arguments.find(nameString) !=
@@ -1978,6 +2037,71 @@ std::string FeatureCharacterization::dumpExactSymbolType(const Symbol *sym) {
   return symTypeString + symTypePrefixString;
 }
 
+bool FeatureCharacterization::IsCInteroperableObject(
+    const semantics::Symbol &sym) {
+  const semantics::Symbol &ultimate = sym.GetUltimate();
+
+  // Must be an object, not a procedure, generic, namelist, etc.
+  if (!ultimate.detailsIf<semantics::ObjectEntityDetails>()) {
+#if PRINT_DEBUG_INFO == 1
+    out_ << "==> [Error in IsCInteroperableObject] Symbol " << ultimate.name()
+         << " is not an object\n";
+#endif
+    return false;
+  }
+
+  const semantics::DeclTypeSpec *type = ultimate.GetType();
+  if (!type) {
+#if PRINT_DEBUG_INFO == 1
+    out_ << "==> [Error in IsCInteroperableObject] Symbol " << ultimate.name()
+         << " has no declared type\n";
+#endif
+    return false;
+  }
+
+  // Reject Fortran-only object attributes.
+  // if (semantics::IsAllocatable(ultimate) || semantics::IsPointer(ultimate)) {
+  //  return false;
+  // }
+
+  const auto &dynamicTypeOpt{evaluate::DynamicType::From(*type)};
+  if (dynamicTypeOpt.has_value()) {
+    const auto &dynamicType{dynamicTypeOpt.value()};
+    if (const auto *derived = type->AsDerived()) {
+      const semantics::Symbol &typeSym = derived->typeSymbol();
+#if PRINT_DEBUG_INFO == 1
+      out_ << "==> [IsCInteroperableObject] Derived type with name="
+           << typeSym.name() << " has attributes: "
+           << (typeSym.attrs().test(semantics::Attr::BIND_C) ? "BIND(C) " : "")
+           << "\n";
+#endif
+      return typeSym.attrs().test(semantics::Attr::BIND_C);
+    }
+    // Intrinsic interoperable types:
+    // integer(c_int), real(c_double), complex(c_float_complex),
+    // logical(c_bool), character(kind=c_char,len=1), etc.
+    const auto interoperable =
+        evaluate::IsInteroperableIntrinsicType(dynamicType);
+    if (interoperable.has_value()) {
+#if PRINT_DEBUG_INFO == 1
+      out_ << "==> [IsCInteroperableObject] Intrinsic type with dynamic type "
+           << dynamicType.AsFortran() << " is "
+           << (interoperable.value() ? "interoperable" : "not interoperable")
+           << "\n";
+#endif
+      return interoperable.value();
+    }
+    return false;
+  }
+
+#if PRINT_DEBUG_INFO == 1
+  out_ << "==> [Error in IsCInteroperableObject] Could not evaluate dynamic "
+          "type of "
+       << ultimate.name() << "\n";
+#endif
+  return false;
+}
+
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
   out_ << "\t\"" << key << "\": ";
@@ -2140,6 +2264,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("C descriptors");
   checkMap("Attribute codes");
   checkMap("The type CFI_dim_t");
+  checkMap("Changes to procedures in the iso_c_binding module");
   checkMap("Assumed rank");
   checkMap("SELECT RANK");
   checkMap("Assumed-size arrays");

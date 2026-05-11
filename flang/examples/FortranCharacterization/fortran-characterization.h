@@ -61,6 +61,7 @@ public:
   std::string symbolKindString(const semantics::Symbol *sym);
   void dumpSymbol(const semantics::Symbol *sym);
   std::string dumpExactSymbolType(const Symbol *sym);
+  bool IsCInteroperableObject(const semantics::Symbol &sym);
 
   template <typename T> bool Pre(const T &x) { return true; }
 
@@ -202,6 +203,7 @@ public:
   // (Fortran 2018)
   // - Internal procedure as an actual argument
   // - Overriding a type-bound procedure
+  // - Changes to procedures in the iso_c_binding module (Fortran 2018)
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);
