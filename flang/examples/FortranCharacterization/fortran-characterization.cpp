@@ -843,6 +843,12 @@ void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
                 }
               }
             }
+          } else {
+            if (ultimate.Rank() > 1) {
+              features
+                  ["Simply contiguous arrays rank remapping to rank>1 target"] =
+                      true;
+            }
           }
         } else {
 #if PRINT_DEBUG_INFO == 1
@@ -2201,7 +2207,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Coarrays");
   checkMap("do concurrent");
   checkMap("Contiguous attribute");
-  // checkMap("Simply contiguous arrays rank remapping to rank>1 target");
+  checkMap("Simply contiguous arrays rank remapping to rank>1 target");
   // checkMap("Maximum rank");
   checkMap("Long integers");
   // checkMap("Allocatable components of recursive type");

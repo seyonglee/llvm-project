@@ -178,6 +178,7 @@ public:
   void Post(const parser::UseStmt &us);
   // - Pointer assignment (rank remapping)
   // - Internal procedure as an actual argument
+  // - Simply contiguous arrays rank remapping to rank>1 target (Fortran 2008)
   void Post(const parser::PointerAssignmentStmt &pas);
   // - import statement
   // - Control of host association
