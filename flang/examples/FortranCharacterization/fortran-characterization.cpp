@@ -614,6 +614,12 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   for (const parser::EntityDecl &ed : entityDeclList) {
     auto const &entityName{std::get<ObjectName>(ed.t)};
     CONVERT2LOWERCASE(entityName.ToString(), enString);
+    const Symbol *sym = entityName.symbol;
+    if ((pointerAttr || allocatableAttr) && IsLocalVariable(*sym)) {
+      if (!saveAttr) {
+        features["Automatic deallocation of allocatable arrays"] = true;
+      }
+    }
     if (valueAttr && is_in_pure_procedure &&
         (dummy_arguments.find(enString) != dummy_arguments.end())) {
       pure_value_dummy_arguments.insert(enString);
@@ -2108,6 +2114,41 @@ bool FeatureCharacterization::IsCInteroperableObject(
   return false;
 }
 
+bool FeatureCharacterization::IsLocalVariable(const semantics::Symbol &sym) {
+  const semantics::Symbol &ultimate = sym.GetUltimate();
+
+  // Must be an object, not a procedure, generic, namelist, etc.
+  if (!ultimate.detailsIf<semantics::ObjectEntityDetails>()) {
+    return false;
+  }
+  const Scope &scope{ultimate.owner()};
+  // Must belong to a procedure/block scope
+  switch (scope.kind()) {
+  case Scope::Kind::MainProgram:
+  case Scope::Kind::Subprogram:
+  case Scope::Kind::BlockData:
+    break;
+  default:
+    return false;
+  }
+  // Exclude dummy arguments
+  if (ultimate.has<ObjectEntityDetails>() &&
+      ultimate.get<ObjectEntityDetails>().isDummy()) {
+    return false;
+  }
+  // Exclude COMMON block objects
+  if (const auto *details{ultimate.detailsIf<ObjectEntityDetails>()}) {
+    if (details->commonBlock()) {
+      return false;
+    }
+  }
+  // Exclude host/use associated symbols
+  if (ultimate.has<HostAssocDetails>() || ultimate.has<UseDetails>()) {
+    return false;
+  }
+  return true;
+}
+
 void FeatureCharacterization::checkMap(const char *key, bool addComma) {
   auto itr = features.find(key);
   out_ << "\t\"" << key << "\": ";
@@ -2138,7 +2179,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Default initialization of derived types");
   checkMap("Pure procedures");
   checkMap("Elemental procedures");
-  // checkMap("Automatic deallocation of allocatable arrays");
+  checkMap("Automatic deallocation of allocatable arrays");
   checkMap("New and enhanced intrinsic procedures");
   out_ << "}\n";
 

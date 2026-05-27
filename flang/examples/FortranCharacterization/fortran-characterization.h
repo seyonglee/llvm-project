@@ -62,6 +62,7 @@ public:
   void dumpSymbol(const semantics::Symbol *sym);
   std::string dumpExactSymbolType(const Symbol *sym);
   bool IsCInteroperableObject(const semantics::Symbol &sym);
+  bool IsLocalVariable(const semantics::Symbol &sym);
 
   template <typename T> bool Pre(const T &x) { return true; }
 
@@ -163,6 +164,7 @@ public:
   // - Assumed rank (Fortran 2018)
   // - Allocatable dummy arguments of intent out (Fortran 2018)
   // - Contiguous attribute for assumed-rank arrays (Fortran 2018)
+  // - Automatic deallocation of allocatable arrays (Fortran 95)
   void Post(const parser::TypeDeclarationStmt &);
   // - Allocatable scalars
   // - Allocatable character length
