@@ -439,8 +439,7 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
                   }
                 }
               }
-            } else if (const auto *const str{
-                           std::get_if<parser::Star>(&tpv->u)}) {
+            } else if (std::get_if<parser::Star>(&tpv->u)) {
               if (is_in_c_binding_procedure) {
                 features["C descriptors"] = true;
                 features["Attribute codes"] = true;
@@ -461,8 +460,7 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
                         std::get_if<parser::IntLiteralConstant>(&lc->u)}) {
                 }
               }
-            } else if (const auto *const str{
-                           std::get_if<parser::Star>(&lk->length.value().u)}) {
+            } else if (std::get_if<parser::Star>(&lk->length.value().u)) {
               if (is_in_c_binding_procedure) {
                 features["C descriptors"] = true;
                 features["Attribute codes"] = true;
@@ -884,9 +882,40 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       features["Initialization of pointers with NULL function"] = true;
     } else if (fnName == "cpu_time") {
       features["New and enhanced intrinsic procedures"] = true;
+    } else if (fnName == "sign") {
+      const auto &argSpec = actArgSpecs.back();
+      const auto &arg = std::get<ActualArg>(argSpec.t);
+      if (const auto *argExpr =
+              std::get_if<common::Indirection<Expr>>(&arg.u)) {
+        if (const auto *negateExpr =
+                std::get_if<Expr::Negate>(&argExpr->value().u)) {
+          if (const auto *const lc{
+                  std::get_if<LiteralConstant>(&negateExpr->v.value().u)}) {
+            if (const auto *const rlc{
+                    std::get_if<RealLiteralConstant>(&lc->u)}) {
+              const auto &rlcStr = rlc->real.source;
+              if (rlcStr.ToString().find("0.0") != std::string::npos) {
+                features["New and enhanced intrinsic procedures"] = true;
+              }
+            }
+          }
+        } else if (const auto *unaryPlusExpr =
+                       std::get_if<Expr::UnaryPlus>(&argExpr->value().u)) {
+          if (const auto *const lc{
+                  std::get_if<LiteralConstant>(&unaryPlusExpr->v.value().u)}) {
+            if (const auto *const rlc{
+                    std::get_if<RealLiteralConstant>(&lc->u)}) {
+              const auto &rlcStr = rlc->real.source;
+              if (rlcStr.ToString().find("0.0") != std::string::npos) {
+                features["New and enhanced intrinsic procedures"] = true;
+              }
+            }
+          }
+        }
+      }
     } else if (fnName == "ceiling" || fnName == "floor") {
-      for (const auto &arg : actArgSpecs) {
-        const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+      for (const auto &argSpec : actArgSpecs) {
+        const auto &optKeyword = std::get<std::optional<Keyword>>(argSpec.t);
         if (optKeyword.has_value()) {
           CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
           if (kw == "kind") {
@@ -896,10 +925,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
         }
       }
     } else if (fnName == "selected_int_kind") {
-      for (const auto &arg : actArgSpecs) {
-        const auto &argSpec = std::get<ActualArg>(arg.t);
+      for (const auto &argSpec : actArgSpecs) {
+        const auto &arg = std::get<ActualArg>(argSpec.t);
         if (const auto *argExpr =
-                std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+                std::get_if<common::Indirection<Expr>>(&arg.u)) {
           if (const auto *const lc{
                   std::get_if<LiteralConstant>(&argExpr->value().u)}) {
             if (const auto *const ilc{
@@ -945,9 +974,9 @@ void FeatureCharacterization::Post(const parser::Call &c) {
     } else if (fnName == "all" || fnName == "any" || fnName == "norm2" ||
         fnName == "parity") {
       if (actArgSpecs.size() == 2) {
-        const auto &argSpec = std::get<ActualArg>(actArgSpecs.back().t);
+        const auto &arg = std::get<ActualArg>(actArgSpecs.back().t);
         if (const auto *argExprPtr =
-                std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+                std::get_if<common::Indirection<Expr>>(&arg.u)) {
           const auto &argExpr = argExprPtr->value();
           if (const auto *const dsn =
                   std::get_if<Indirection<Designator>>(&argExpr.u)) {
@@ -970,8 +999,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
         int tIndex = 0;
         bool keyword_used = false;
         bool found_dim = false;
-        for (const auto &arg : actArgSpecs) {
-          const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+        for (const auto &argSpec : actArgSpecs) {
+          const auto &optKeyword = std::get<std::optional<Keyword>>(argSpec.t);
           if (optKeyword.has_value()) {
             keyword_used = true;
             CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
@@ -982,9 +1011,9 @@ void FeatureCharacterization::Post(const parser::Call &c) {
             keyword_used = false;
           }
           if (found_dim || (!keyword_used && (tIndex == 1))) {
-            const auto &argSpec = std::get<ActualArg>(arg.t);
+            const auto &arg = std::get<ActualArg>(argSpec.t);
             if (const auto *argExprPtr =
-                    std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+                    std::get_if<common::Indirection<Expr>>(&arg.u)) {
               const auto &argExpr = argExprPtr->value();
               if (const auto *const dsn =
                       std::get_if<Indirection<Designator>>(&argExpr.u)) {
@@ -1013,8 +1042,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       if (actArgSpecs.size() > 1) {
         int tIndex = 0;
         bool found_dim = false;
-        for (const auto &arg : actArgSpecs) {
-          const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+        for (const auto &argSpec : actArgSpecs) {
+          const auto &optKeyword = std::get<std::optional<Keyword>>(argSpec.t);
           if (optKeyword.has_value()) {
             CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
             if (kw == "dim") {
@@ -1027,7 +1056,7 @@ void FeatureCharacterization::Post(const parser::Call &c) {
             }
           } else {
             if (tIndex == 1) {
-              const auto &actArg = std::get<ActualArg>(arg.t);
+              const auto &actArg = std::get<ActualArg>(argSpec.t);
               if (const auto *argExprPtr =
                       std::get_if<common::Indirection<Expr>>(&actArg.u)) {
                 const auto &argExpr = argExprPtr->value();
@@ -1056,7 +1085,7 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                 features["Optional back argument added to maxloc and minloc"] =
                     true;
               } else if (tIndex == 3) {
-                const auto &actArg = std::get<ActualArg>(arg.t);
+                const auto &actArg = std::get<ActualArg>(argSpec.t);
                 if (const auto *argExprPtr =
                         std::get_if<common::Indirection<Expr>>(&actArg.u)) {
                   const auto &argExpr = argExprPtr->value();
@@ -1085,9 +1114,9 @@ void FeatureCharacterization::Post(const parser::Call &c) {
             }
           }
           if (found_dim) {
-            const auto &argSpec = std::get<ActualArg>(arg.t);
+            const auto &arg = std::get<ActualArg>(argSpec.t);
             if (const auto *argExprPtr =
-                    std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+                    std::get_if<common::Indirection<Expr>>(&arg.u)) {
               const auto &argExpr = argExprPtr->value();
               if (const auto *const dsn =
                       std::get_if<Indirection<Designator>>(&argExpr.u)) {
@@ -1113,8 +1142,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       if (actArgSpecs.size() > 2) {
         int tIndex = 0;
         bool found_dim = false;
-        for (const auto &arg : actArgSpecs) {
-          const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+        for (const auto &argSpec : actArgSpecs) {
+          const auto &optKeyword = std::get<std::optional<Keyword>>(argSpec.t);
           if (optKeyword.has_value()) {
             CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
             if (kw == "dim") {
@@ -1122,7 +1151,7 @@ void FeatureCharacterization::Post(const parser::Call &c) {
             }
           } else {
             if (tIndex == 2) {
-              const auto &actArg = std::get<ActualArg>(arg.t);
+              const auto &actArg = std::get<ActualArg>(argSpec.t);
               if (const auto *argExprPtr =
                       std::get_if<common::Indirection<Expr>>(&actArg.u)) {
                 const auto &argExpr = argExprPtr->value();
@@ -1148,9 +1177,9 @@ void FeatureCharacterization::Post(const parser::Call &c) {
             }
           }
           if (found_dim) {
-            const auto &argSpec = std::get<ActualArg>(arg.t);
+            const auto &arg = std::get<ActualArg>(argSpec.t);
             if (const auto *argExprPtr =
-                    std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+                    std::get_if<common::Indirection<Expr>>(&arg.u)) {
               const auto &argExpr = argExprPtr->value();
               if (const auto *const dsn =
                       std::get_if<Indirection<Designator>>(&argExpr.u)) {
@@ -1178,8 +1207,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       features
           ["Access to the computing environment (Command line processing)"] =
               true;
-      for (const auto &arg : actArgSpecs) {
-        const auto &optKeyword = std::get<std::optional<Keyword>>(arg.t);
+      for (const auto &argSpec : actArgSpecs) {
+        const auto &optKeyword = std::get<std::optional<Keyword>>(argSpec.t);
         if (optKeyword.has_value()) {
           CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
           if (kw == "errmsg") {
@@ -1199,10 +1228,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       if ((fnName == "c_f_pointer") || (fnName == "c_loc") ||
           (fnName == "c_f_procpointer") || (fnName == "c_funloc")) {
         int argIndex = 0;
-        for (const auto &arg : actArgSpecs) {
-          const auto &argSpec = std::get<ActualArg>(arg.t);
+        for (const auto &argSpec : actArgSpecs) {
+          const auto &arg = std::get<ActualArg>(argSpec.t);
           if (const auto *argExprPtr =
-                  std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+                  std::get_if<common::Indirection<Expr>>(&arg.u)) {
             const auto &argExpr = argExprPtr->value();
             if (const auto *const dsn =
                     std::get_if<Indirection<Designator>>(&argExpr.u)) {
@@ -1213,7 +1242,7 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                   if (sym) {
                     const Symbol &ultimate{sym->GetUltimate()};
                     const auto &optKeyword =
-                        std::get<std::optional<Keyword>>(arg.t);
+                        std::get<std::optional<Keyword>>(argSpec.t);
                     bool is_cptr_or_fptr = false;
                     if (optKeyword.has_value()) {
                       CONVERT2LOWERCASE(optKeyword.value().v.ToString(), kw);
@@ -1256,10 +1285,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
     features["Procedures bound by name to a type (type-bound procedures)"] =
         true;
   }
-  for (const auto &arg : actArgSpecs) {
-    const auto &argSpec = std::get<ActualArg>(arg.t);
+  for (const auto &argSpec : actArgSpecs) {
+    const auto &arg = std::get<ActualArg>(argSpec.t);
     if (const auto *argExprPtr =
-            std::get_if<common::Indirection<Expr>>(&argSpec.u)) {
+            std::get_if<common::Indirection<Expr>>(&arg.u)) {
       const auto &argExpr = argExprPtr->value();
       if (const auto *const dsn =
               std::get_if<Indirection<Designator>>(&argExpr.u)) {
