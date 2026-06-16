@@ -189,6 +189,12 @@ bool FeatureCharacterization::is_in_pure_procedure = false;
 
 bool FeatureCharacterization::is_in_module = false;
 
+bool FeatureCharacterization::is_in_submodule = false;
+
+bool FeatureCharacterization::is_in_function = false;
+
+bool FeatureCharacterization::is_in_subroutine = false;
+
 bool FeatureCharacterization::is_in_user_defined_operator_function = false;
 
 bool FeatureCharacterization::is_in_user_defined_assignment_subroutine = false;
@@ -603,6 +609,12 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   if (is_in_c_binding_procedure) {
     if (allocatableAttr && intentOutAttr) {
       features["Allocatable dummy arguments of intent out"] = true;
+    }
+  }
+  if ((is_in_module || is_in_submodule) &&
+      (!is_in_function && !is_in_subroutine)) {
+    if (!saveAttr) {
+      features["Save attribute for module and submodule data"] = true;
     }
   }
   if (saveAttr && targetAttr) {
@@ -1466,6 +1478,7 @@ void FeatureCharacterization::Post(const parser::SubroutineStmt &sts) {
       user_defined_assignment.end()) {
     is_in_user_defined_assignment_subroutine = true;
   }
+  is_in_subroutine = true;
   const auto &dummyArgs{std::get<std::list<parser::DummyArg>>(sts.t)};
   for (const auto &dummyArg : dummyArgs) {
     const auto *dummyArgName{std::get_if<parser::Name>(&dummyArg.u)};
@@ -1477,6 +1490,7 @@ void FeatureCharacterization::Post(const parser::EndSubroutineStmt &ests) {
   is_in_c_binding_procedure = false;
   is_in_pure_procedure = false;
   is_in_user_defined_assignment_subroutine = false;
+  is_in_subroutine = false;
   dummy_arguments.clear();
   pure_value_dummy_arguments.clear();
   optional_dummy_arguments.clear();
@@ -1494,6 +1508,7 @@ void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
   if (user_defined_operators.find(nameString) != user_defined_operators.end()) {
     is_in_user_defined_operator_function = true;
   }
+  is_in_function = true;
   const auto &dummyArgs{std::get<std::list<parser::Name>>(fts.t)};
   for (const auto &dummyArg : dummyArgs) {
     CONVERT2LOWERCASE(dummyArg.ToString(), dummyArgString);
@@ -1504,6 +1519,7 @@ void FeatureCharacterization::Post(const parser::EndFunctionStmt &efts) {
   is_in_c_binding_procedure = false;
   is_in_pure_procedure = false;
   is_in_user_defined_operator_function = false;
+  is_in_function = false;
   dummy_arguments.clear();
   pure_value_dummy_arguments.clear();
   optional_dummy_arguments.clear();
@@ -1523,7 +1539,11 @@ std::vector<std::string>
         "int8", "int16", "int32", "int64", "real32", "real64", "real128",
         "iostat_inquire_internal_unit"};
 void FeatureCharacterization::Post(const parser::SubmoduleStmt &) {
+  is_in_submodule = true;
   features["Submodules"] = true;
+}
+void FeatureCharacterization::Post(const parser::EndSubmoduleStmt &ls) {
+  is_in_submodule = false;
 }
 void FeatureCharacterization::Post(const parser::DoConstruct &node) {
   features["do concurrent"] = node.IsDoConcurrent();
@@ -2322,7 +2342,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Compiler information in ISO_FORTRAN_ENV");
   checkMap("Function for C sizeof");
   // checkMap("Optional argument for ieee_selected_real_kind");
-  // checkMap("Save attribute for module and submodule data");
+  checkMap("Save attribute for module and submodule data");
   // checkMap("Empty contains part");
   // checkMap("Form of the end statement for an internal or module
   // procedure");

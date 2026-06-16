@@ -96,6 +96,12 @@ public:
 
   static bool is_in_module;
 
+  static bool is_in_submodule;
+
+  static bool is_in_function;
+
+  static bool is_in_subroutine;
+
   static bool is_in_user_defined_operator_function;
 
   static bool is_in_user_defined_assignment_subroutine;
@@ -235,7 +241,10 @@ public:
   static std::vector<std::string> Fortran2008_iso_Fortran_env_constant_arrays;
   static std::vector<std::string> Fortran2008_iso_Fortran_env_constant_scalars;
   // - Submodules
+  // - Save attribute for module and submodule data
   void Post(const parser::SubmoduleStmt &);
+  // - Save attribute for module and submodule data
+  void Post(const parser::EndSubmoduleStmt &);
   // - Coarrays
   // - do concurrent
   void Post(const parser::DoConstruct &);
