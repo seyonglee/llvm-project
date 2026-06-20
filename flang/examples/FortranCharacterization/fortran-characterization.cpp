@@ -284,6 +284,20 @@ std::vector<std::string>
         "c_intmax_t", "c_intptr_t", "c_float", "c_double", "c_long_double",
         "c_float_complex", "c_double_complex", "c_long_double_complex",
         "c_bool", "c_char"};
+bool FeatureCharacterization::Pre(const parser::Expr &expr) {
+  if (std::holds_alternative<parser::ArrayConstructor>(expr.u)) {
+    std::string src = expr.source.ToString();
+
+    // Usually src begins with "(/" or "[".
+    // You may want to trim leading blanks defensively.
+    auto first = src.find_first_not_of(" \t\n\r");
+    if (first != std::string::npos && first + 1 < src.size() &&
+        src[first] == '[') {
+      features["Array constructor syntax"] = true;
+    }
+  }
+  return true;
+}
 // R1512 procedure-declaration-stmt ->
 //         PROCEDURE ( [proc-interface] ) [[, proc-attr-spec]... ::]
 //         proc-decl-list
@@ -2265,7 +2279,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Support for international character sets");
   // checkMap("Binary, octal and hex constants");
   // checkMap("Lengths of names and statements")
-  // checkMap("Array constructor syntax");
+  checkMap("Array constructor syntax");
   // checkMap("Specification and initialization expressions");
   // checkMap("Complex constants");
   // checkMap("Changes to intrinsic functions");

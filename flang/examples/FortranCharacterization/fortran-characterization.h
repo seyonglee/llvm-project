@@ -132,6 +132,8 @@ public:
   /////////////////////////////////
   static std::vector<std::string> Fortran2003_interop_c_procedures;
   static std::vector<std::string> Fortran2003_interop_c_intrinsictypes;
+  // - Array constructor syntax
+  bool Pre(const parser::Expr &);
   // - procedure pointers
   void Post(const parser::ProcedureDeclarationStmt &);
   // - parameterized derived types
