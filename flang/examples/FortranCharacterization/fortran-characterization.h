@@ -106,6 +106,10 @@ public:
 
   static bool is_in_user_defined_assignment_subroutine;
 
+  static bool is_in_initialization;
+
+  static bool is_in_type_declaration_stmt;
+
   // - Constants in ISO_FORTRAN_ENV (Fortran 2008)
   void Post(const parser::Name &);
   ///////////////////////////////
@@ -134,6 +138,11 @@ public:
   static std::vector<std::string> Fortran2003_interop_c_intrinsictypes;
   // - Array constructor syntax
   bool Pre(const parser::Expr &);
+  // - Specification and initialization expressions
+  bool Pre(const parser::Initialization &init);
+  bool Post(const parser::Initialization &init);
+  bool Post(const parser::StructureConstructor &init);
+  bool Pre(const parser::TypeDeclarationStmt &init);
   // - procedure pointers
   void Post(const parser::ProcedureDeclarationStmt &);
   // - parameterized derived types
@@ -215,6 +224,7 @@ public:
   // - Internal procedure as an actual argument
   // - Overriding a type-bound procedure
   // - Changes to procedures in the iso_c_binding module (Fortran 2018)
+  // - Specification and initialization expressions
   void Post(const parser::Call &cs);
   // - Derived type I/O
   void Post(const parser::IoControlSpec &iocs);

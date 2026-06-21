@@ -199,6 +199,10 @@ bool FeatureCharacterization::is_in_user_defined_operator_function = false;
 
 bool FeatureCharacterization::is_in_user_defined_assignment_subroutine = false;
 
+bool FeatureCharacterization::is_in_initialization = false;
+
+bool FeatureCharacterization::is_in_type_declaration_stmt = false;
+
 void FeatureCharacterization::Post(const parser::Name &name) {
   if (use_iso_Fortran_env) {
     CONVERT2LOWERCASE(name.ToString(), nameString);
@@ -296,6 +300,30 @@ bool FeatureCharacterization::Pre(const parser::Expr &expr) {
       features["Array constructor syntax"] = true;
     }
   }
+  return true;
+}
+// R743 component-initialization ->
+//        = constant-expr | => null-init | => initial-data-target
+// R805 initialization ->
+//        = constant-expr | => null-init | => initial-data-target
+// Universal extension: initialization -> / data-stmt-value-list /
+bool FeatureCharacterization::Pre(const parser::Initialization &init) {
+  is_in_initialization = true;
+  return true;
+}
+bool FeatureCharacterization::Post(const parser::Initialization &init) {
+  is_in_initialization = false;
+}
+// R756 structure-constructor -> derived-type-spec ( [component-spec-list] )
+bool FeatureCharacterization::Post(const parser::StructureConstructor &init) {
+  if (is_in_initialization) {
+    features["Specification and initialization expressions"] = true;
+  }
+}
+// R801 type-declaration-stmt ->
+//        declaration-type-spec [[, attr-spec]... ::] entity-decl-list
+bool FeatureCharacterization::Pre(const parser::TypeDeclarationStmt &tds) {
+  is_in_type_declaration_stmt = true;
   return true;
 }
 // R1512 procedure-declaration-stmt ->
@@ -538,6 +566,8 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
   const auto &dts{std::get<parser::DeclarationTypeSpec>(tds.t)};
   const auto &attrSpecList{std::get<std::list<parser::AttrSpec>>(tds.t)};
   const auto &entityDeclList{std::get<std::list<parser::EntityDecl>>(tds.t)};
+
+  is_in_type_declaration_stmt = false;
 
   // check AttrSpecList to see if Allocatable or Pointer is in there
   bool allocatableAttr{false};
@@ -903,6 +933,15 @@ void FeatureCharacterization::Post(const parser::Call &c) {
   const auto &pd{std::get<ProcedureDesignator>(c.t)};
   if (const auto *const name{std::get_if<Name>(&pd.u)}) {
     CONVERT2LOWERCASE(name->ToString(), fnName);
+    Symbol *sym = name->symbol;
+    if (sym) {
+      if (is_in_type_declaration_stmt) {
+        const Symbol &ultimate{sym->GetUltimate()};
+        if (ultimate.attrs().test(Fortran::semantics::Attr::PURE)) {
+          features["Specification and initialization expressions"] = true;
+        }
+      }
+    }
     if (fnName == "null") {
       features["New and enhanced intrinsic procedures"] = true;
       features["Initialization of pointers with NULL function"] = true;
@@ -2280,7 +2319,7 @@ void FeatureCharacterization::checkAllFeatures() {
   // checkMap("Binary, octal and hex constants");
   // checkMap("Lengths of names and statements")
   checkMap("Array constructor syntax");
-  // checkMap("Specification and initialization expressions");
+  checkMap("Specification and initialization expressions");
   // checkMap("Complex constants");
   // checkMap("Changes to intrinsic functions");
   // checkMap("Controlling IEEE underflow");
