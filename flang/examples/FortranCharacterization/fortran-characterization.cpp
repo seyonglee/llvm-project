@@ -1,7 +1,3 @@
-// TODO: create a template where we check for a given feature in the map by
-// providing const char* argument instead of creating a new function every time
-
-// attributes of interest
 #include "fortran-characterization.h"
 #include "flang/Common/indirection.h"
 #include "flang/Evaluate/tools.h"
@@ -206,14 +202,21 @@ bool FeatureCharacterization::is_in_type_declaration_stmt = false;
 void FeatureCharacterization::Post(const parser::Name &name) {
   if (use_iso_Fortran_env) {
     CONVERT2LOWERCASE(name.ToString(), nameString);
-    if (nameString.compare("iostat_inquire_internal_unit") == 0) {
-      features["Constants in ISO_FORTRAN_ENV"] = true;
-    } else {
-      for (const auto &constName :
-          Fortran2008_iso_Fortran_env_constant_arrays) {
-        if (nameString.compare(constName) == 0) {
-          features["Constants in ISO_FORTRAN_ENV"] = true;
-          break;
+    bool fortran2008_iso_Fortran_env_constant_found = false;
+    for (const auto &constName : Fortran2008_iso_Fortran_env_constant_arrays) {
+      if (nameString.compare(constName) == 0) {
+        features["Constants in ISO_FORTRAN_ENV"] = true;
+        fortran2008_iso_Fortran_env_constant_found = true;
+        break;
+      }
+      if (!fortran2008_iso_Fortran_env_constant_found) {
+        for (const auto &constName :
+            Fortran2008_iso_Fortran_env_constant_scalars) {
+          if (nameString.compare(constName) == 0) {
+            features["Constants in ISO_FORTRAN_ENV"] = true;
+            fortran2008_iso_Fortran_env_constant_found = true;
+            break;
+          }
         }
       }
     }
@@ -311,11 +314,11 @@ bool FeatureCharacterization::Pre(const parser::Initialization &init) {
   is_in_initialization = true;
   return true;
 }
-bool FeatureCharacterization::Post(const parser::Initialization &init) {
+void FeatureCharacterization::Post(const parser::Initialization &init) {
   is_in_initialization = false;
 }
 // R756 structure-constructor -> derived-type-spec ( [component-spec-list] )
-bool FeatureCharacterization::Post(const parser::StructureConstructor &init) {
+void FeatureCharacterization::Post(const parser::StructureConstructor &init) {
   if (is_in_initialization) {
     features["Specification and initialization expressions"] = true;
   }
@@ -429,13 +432,6 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
               }
             }
           }
-        } else if (const auto *const fr{
-                       std::get_if<Indirection<FunctionReference>>(
-                           &kindExp.u)}) {
-          // FIXME: Parser incorrectly creates FunctionReference instead of
-          // ArrayElement. To fix this, semantic analysis should
-          // convert FunctionReference to ArrayElement.
-          // Temporarily, this check is handled by Post(const parser::Name &).
         }
       }
     };
@@ -801,19 +797,6 @@ void FeatureCharacterization::Post(const parser::AllocateStmt &allocateStmt) {
       }
     }
   }
-  /*if (auto info{CheckAllocateOptions(allocateStmt, context_)}) {
-    for (const parser::Allocation &allocation :
-        std::get<std::list<parser::Allocation>>(allocateStmt.t)) {
-      AllocationCheckerHelper ach{allocation, *info};
-      if (ach.checkScalar()) {
-        features["Allocatable scalars"] = true;
-      }
-      if (ach.checkAllocatableCharacter())
-        features["Allocatable character length"] = true;
-    }
-    if (info->gotSource)
-      features["The allocate statement (allocate with SOURCE)"] = true;
-  }*/
 }
 // R829 allocatable-stmt -> ALLOCATABLE [::] allocatable-decl-list
 void FeatureCharacterization::Post(

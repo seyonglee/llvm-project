@@ -8,12 +8,6 @@
  * - I will need to overwrite the Pre and Post functions though
  */
 
-// #include "check-declarations.cpp"
-// #include "check-declarations.h"
-//////#include "check-allocate-anthony.h" // TODO: make cleaner
-//////#include "check-allocate.h"
-//////#include "check.h"
-// #include "pointer-assignment-anthony.h" // TODO: make cleaner
 #include "flang/Common/idioms.h"
 #include "flang/Common/indirection.h"
 #include "flang/Frontend/CompilerInstance.h"
@@ -40,15 +34,6 @@ using namespace Fortran::common;
 using namespace Fortran::frontend;
 using namespace Fortran::parser;
 using namespace Fortran;
-
-//////namespace Fortran::semantics {
-//////class CheckHelperAnthony : public CheckHelper {
-//////public:
-//////  CheckHelperAnthony(SemanticsContext &c) : CheckHelper(c){};
-//////
-//////private:
-//////};
-//////} // namespace Fortran::semantics
 
 class FeatureCharacterization { // this is a visitor
 public:
@@ -140,8 +125,8 @@ public:
   bool Pre(const parser::Expr &);
   // - Specification and initialization expressions
   bool Pre(const parser::Initialization &init);
-  bool Post(const parser::Initialization &init);
-  bool Post(const parser::StructureConstructor &init);
+  void Post(const parser::Initialization &init);
+  void Post(const parser::StructureConstructor &init);
   bool Pre(const parser::TypeDeclarationStmt &init);
   // - procedure pointers
   void Post(const parser::ProcedureDeclarationStmt &);
@@ -345,27 +330,8 @@ public:
 protected:
 private:
   llvm::raw_ostream &out_;
-  // const AnalyzedObjectsAsFortran *const asFortran_;
   static std::unordered_map<const char *, bool> features;
-  // SemanticsContext &context_;
 };
-
-/*static void checkOverride(CheckHelperAnthony &ch) {
-  if (ch.getOverridePresent())
-    llvm::outs() << "TRUE: ";
-  else
-    llvm::outs() << "FALSE: ";
-  llvm::outs() << "Overriding a type-bound procedure\n";
-}
-
-static void checkTypeBoundProc(CheckHelperAnthony &ch) {
-  if (ch.getTypeBoundProcPresent())
-    llvm::outs() << "TRUE: ";
-  else
-    llvm::outs() << "FALSE: ";
-  llvm::outs()
-      << "Procedures bound by a name to a type (type-bound procedures)\n";
-}*/
 
 class FeatureListAction : public PluginParseTreeAction {
   void executeAction() override {
@@ -376,44 +342,7 @@ class FeatureListAction : public PluginParseTreeAction {
     auto &pt = getParsing().parseTree();
     Fortran::parser::Walk(pt, visitor);
 
-    // Fortran::semantics::CheckHelperAnthony ch{semanticsCtx};
-    //  initialize ch with checking to see if stuff is present
-    //  checks for
-    //  - override
-    //  - type bound proc
-
-    // remove and discuss
-    /*auto &scope = semanticsCtx.globalScope();
-    ch.Check(scope);
-
-    // checkOverride(ch);
-    visitor.setMap(
-        "Overriding a type-bound procedure", ch.getOverridePresent());
-    // checkTypeBoundProc(ch);
-    visitor.setMap(
-        "Procedures bound by a name to a type (type-bound procedures)",
-        ch.getTypeBoundProcPresent());*/
-
     visitor.checkAllFeatures();
-
-    /* visitor.setMap(
-         "Interoperability with C pointers", ch.getCPtrInteropPresent());
-    visitor.checkMap("Interoperability with C pointers");*/
-
-    /*for (auto &pair : scope) {
-      llvm::outs() << pair.first << "\nYOOOO\n";
-      //if (!ch.findTypeBoundProcOverrides(*pair.second))
-      //  llvm::outs() << "FALSE: Overriding a type-bound procedure\n";
-      for (const Scope &child : scope.children()) {
-
-      }
-
-    }*/
-
-    // Fortran::semantics::AllocateChecker ac{semanticsCtx};
-
-    // for all features in the map:
-    //   print key: value
   }
 
   // don't need to override beginSourceFileAction because it already does
