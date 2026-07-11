@@ -382,7 +382,7 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
     features["Assumed type"] = true;
   } else if (const auto *const typeT{
                  std::get_if<parser::DeclarationTypeSpec::Type>(&dts.u)}) {
-    const auto &tname{std::get<Name>(typeT->derived.t)};
+    const auto &tname{std::get<Name>(typeT->v.t)};
     CONVERT2LOWERCASE(tname.ToString(), tnString);
     if ((tnString.compare("c_funptr") == 0) ||
         (tnString.compare("c_ptr") == 0)) {
@@ -418,7 +418,7 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
             } else if (const auto *const ae{
                            std::get_if<Indirection<ArrayElement>>(&dref->u)}) {
               if (const auto *const aname{
-                      std::get_if<Name>(&ae->value().base.u)}) {
+                      std::get_if<Name>(&ae->value().Base().u)}) {
                 CONVERT2LOWERCASE(aname->ToString(), anString);
                 auto it2 = std::find(
                     Fortran2008_iso_Fortran_env_constant_arrays.begin(),
@@ -437,8 +437,8 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
     };
     if (const auto *const realT{
             std::get_if<parser::IntrinsicTypeSpec::Real>(&intrT->u)}) {
-      if (realT->kind.has_value()) {
-        check_interop_intrinsic_types(realT->kind.value());
+      if (realT->v.has_value()) {
+        check_interop_intrinsic_types(realT->v.value());
       }
     } else if (const auto *const intT{
                    std::get_if<parser::IntegerTypeSpec>(&intrT->u)}) {
@@ -448,21 +448,21 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
     } else if (const auto *const compT{
                    std::get_if<parser::IntrinsicTypeSpec::Complex>(
                        &intrT->u)}) {
-      if (compT->kind.has_value()) {
-        check_interop_intrinsic_types(compT->kind.value());
+      if (compT->v.has_value()) {
+        check_interop_intrinsic_types(compT->v.value());
       }
     } else if (const auto *const logicT{
                    std::get_if<parser::IntrinsicTypeSpec::Logical>(
                        &intrT->u)}) {
-      if (logicT->kind.has_value()) {
-        check_interop_intrinsic_types(logicT->kind.value());
+      if (logicT->v.has_value()) {
+        check_interop_intrinsic_types(logicT->v.value());
       }
     } else if (const auto *const charT{
                    std::get_if<parser::IntrinsicTypeSpec::Character>(
                        &intrT->u)}) {
-      if (charT->selector.has_value()) {
-        if (const auto *const ls{std::get_if<parser::LengthSelector>(
-                &charT->selector.value().u)}) {
+      if (charT->v.has_value()) {
+        if (const auto *const ls{
+                std::get_if<parser::LengthSelector>(&charT->v.value().u)}) {
           if (const auto *const tpv{
                   std::get_if<parser::TypeParamValue>(&ls->u)}) {
             if (const auto *const sie{
@@ -493,10 +493,12 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
           }
         } else if (const auto *const lk{
                        std::get_if<parser::CharSelector::LengthAndKind>(
-                           &charT->selector.value().u)}) {
-          if (lk->length.has_value()) {
+                           &charT->v.value().u)}) {
+          const auto &typeParamV =
+              std::get<std::optional<parser::TypeParamValue>>(lk->t);
+          if (typeParamV.has_value()) {
             if (const auto *const sie{std::get_if<parser::ScalarIntExpr>(
-                    &lk->length.value().u)}) {
+                    &typeParamV.value().u)}) {
               const auto &lenExp{sie->thing.thing.value()};
               if (const auto *const lc{
                       std::get_if<parser::LiteralConstant>(&lenExp.u)}) {
@@ -504,7 +506,7 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
                         std::get_if<parser::IntLiteralConstant>(&lc->u)}) {
                 }
               }
-            } else if (std::get_if<parser::Star>(&lk->length.value().u)) {
+            } else if (std::get_if<parser::Star>(&typeParamV.value().u)) {
               if (is_in_c_binding_procedure) {
                 features["C descriptors"] = true;
                 features["Attribute codes"] = true;
@@ -512,7 +514,8 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
               }
             }
           }
-          const auto &kindExp{lk->kind.thing.thing.thing.value()};
+          const auto &tKind = std::get<parser::ScalarIntConstantExpr>(lk->t);
+          const auto &kindExp{tKind.thing.thing.thing.value()};
           if (const auto *const dsn{
                   std::get_if<Indirection<Designator>>(&kindExp.u)}) {
             if (const auto *const dref{std::get_if<DataRef>(&dsn->value().u)}) {
@@ -528,7 +531,7 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
                              std::get_if<common::Indirection<ArrayElement>>(
                                  &dref->u)}) {
                 if (const auto *const aname{
-                        std::get_if<Name>(&ae->value().base.u)}) {
+                        std::get_if<Name>(&ae->value().Base().u)}) {
                   CONVERT2LOWERCASE(aname->ToString(), anString);
                   if (use_iso_Fortran_env && (anString == "character_kinds")) {
                     features["Constants in ISO_FORTRAN_ENV"] = true;
@@ -905,7 +908,8 @@ void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
 }
 void FeatureCharacterization::Post(const parser::ImportStmt &is) {
   features["The IMPORT statement"] = true;
-  if (is.kind != common::ImportKind::Default) {
+  const auto &importKind{std::get<common::ImportKind>(is.t)};
+  if (importKind != common::ImportKind::Default) {
     features["Control of host association"] = true;
   }
 }
@@ -941,7 +945,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                   std::get_if<LiteralConstant>(&negateExpr->v.value().u)}) {
             if (const auto *const rlc{
                     std::get_if<RealLiteralConstant>(&lc->u)}) {
-              const auto &rlcStr = rlc->real.source;
+              const auto &tReal = std::get<RealLiteralConstant::Real>(rlc->t);
+              const auto &rlcStr = tReal.source;
               if (rlcStr.ToString().find("0.0") != std::string::npos) {
                 features["New and enhanced intrinsic procedures"] = true;
               }
@@ -953,7 +958,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                   std::get_if<LiteralConstant>(&unaryPlusExpr->v.value().u)}) {
             if (const auto *const rlc{
                     std::get_if<RealLiteralConstant>(&lc->u)}) {
-              const auto &rlcStr = rlc->real.source;
+              const auto &tReal = std::get<RealLiteralConstant::Real>(rlc->t);
+              const auto &rlcStr = tReal.source;
               if (rlcStr.ToString().find("0.0") != std::string::npos) {
                 features["New and enhanced intrinsic procedures"] = true;
               }
@@ -1324,7 +1330,7 @@ void FeatureCharacterization::Post(const parser::Call &c) {
     }
   }
   if (const auto *procCompRef{std::get_if<ProcComponentRef>(&pd.u)}) {
-    const auto *typeBoundProcSym{procCompRef->v.thing.component.symbol};
+    const auto *typeBoundProcSym{procCompRef->v.thing.Component().symbol};
     bool isInaccessibleDeferred{false};
     if (semantics::FindOverriddenBinding(
             *typeBoundProcSym, isInaccessibleDeferred)) {
@@ -1496,7 +1502,8 @@ void FeatureCharacterization::Post(const parser::ProcAttrSpec &pas) {
   }
 }
 void FeatureCharacterization::Post(const parser::Suffix &sfx) {
-  if (sfx.binding.has_value()) {
+  const auto &binding{std::get<std::optional<LanguageBindingSpec>>(sfx.t)};
+  if (binding.has_value()) {
     features["Interoperability of procedures"] = true;
   }
 }
@@ -1533,7 +1540,9 @@ void FeatureCharacterization::Post(const parser::EndSubroutineStmt &ests) {
 }
 void FeatureCharacterization::Post(const parser::FunctionStmt &fts) {
   const auto &sufx{std::get<std::optional<Suffix>>(fts.t)};
-  if (sufx.has_value() && sufx.value().binding.has_value()) {
+  if (sufx.has_value() &&
+      std::get<std::optional<LanguageBindingSpec>>(sufx.value().t)
+          .has_value()) {
     features["Interoperability of procedures"] = true;
     is_in_c_binding_procedure = true;
   } else {
@@ -1879,7 +1888,7 @@ void FeatureCharacterization::Post(const parser::AssignmentStmt &as) {
       } else if (const auto *ar{
                      std::get_if<common::Indirection<parser::ArrayElement>>(
                          &dr->u)}) {
-        const auto &base{ar->value().base};
+        const auto &base{ar->value().Base()};
         if (const auto *name{std::get_if<parser::Name>(&base.u)}) {
           CONVERT2LOWERCASE(name->ToString(), nameString);
           if (pure_value_dummy_arguments.find(nameString) !=
@@ -1917,7 +1926,7 @@ void FeatureCharacterization::Post(const parser::ReadStmt &rs) {
           } else if (const auto *ar{
                          std::get_if<common::Indirection<parser::ArrayElement>>(
                              &dr->u)}) {
-            const auto &base{ar->value().base};
+            const auto &base{ar->value().Base()};
             if (const auto *name{std::get_if<parser::Name>(&base.u)}) {
               CONVERT2LOWERCASE(name->ToString(), nameString);
               if (pure_value_dummy_arguments.find(nameString) !=
@@ -1959,7 +1968,7 @@ void FeatureCharacterization::Post(const parser::WriteStmt &ws) {
           } else if (const auto *ar{
                          std::get_if<common::Indirection<parser::ArrayElement>>(
                              &dr->u)}) {
-            const auto &base{ar->value().base};
+            const auto &base{ar->value().Base()};
             if (const auto *name{std::get_if<parser::Name>(&base.u)}) {
               CONVERT2LOWERCASE(name->ToString(), nameString);
               if (pure_value_dummy_arguments.find(nameString) !=
