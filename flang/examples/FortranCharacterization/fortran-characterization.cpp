@@ -925,7 +925,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       if (is_in_type_declaration_stmt) {
         const Symbol &ultimate{sym->GetUltimate()};
         if (ultimate.attrs().test(Fortran::semantics::Attr::PURE)) {
-          features["Specification and initialization expressions"] = true;
+          if (fnName != "null") {
+            // Initializing with a null function is introduced in Fortran 95.
+            features["Specification and initialization expressions"] = true;
+          }
         }
       }
     }
