@@ -129,7 +129,7 @@ std::unordered_map<const char *, bool> FeatureCharacterization::features{
     {"Contiguous attribute for assumed-rank arrays", false},
     {"Default accessibility for entities accessed from a module", false},
     {"Implicit none enhancement", false},
-    {"Rules for generic procedures", false},
+    {"Rules for generic procedures", false}, {"Intrinsic function sign", false},
     {"Changes to Intrinsics that access the computing environment", false},
     {"New reduction intrinsic reduce", false},
     {"Intrinsic function coshape", false},
@@ -938,6 +938,27 @@ void FeatureCharacterization::Post(const parser::Call &c) {
     } else if (fnName == "cpu_time") {
       features["New and enhanced intrinsic procedures"] = true;
     } else if (fnName == "sign") {
+      if (actArgSpecs.size() == 2) {
+        auto argSpec{actArgSpecs.begin()};
+        const auto &firstArg{std::get<ActualArg>(argSpec->t)};
+        const auto &secondArg{std::get<ActualArg>((++argSpec)->t)};
+        const auto *firstArgExpr{
+            std::get_if<common::Indirection<Expr>>(&firstArg.u)};
+        const auto *secondArgExpr{
+            std::get_if<common::Indirection<Expr>>(&secondArg.u)};
+        if (firstArgExpr && secondArgExpr) {
+          const auto *firstTypedExpr{GetExpr(firstArgExpr->value())};
+          const auto *secondTypedExpr{GetExpr(secondArgExpr->value())};
+          if (firstTypedExpr && secondTypedExpr) {
+            const auto firstType{firstTypedExpr->GetType()};
+            const auto secondType{secondTypedExpr->GetType()};
+            if (firstType && secondType &&
+                firstType->kind() != secondType->kind()) {
+              features["Intrinsic function sign"] = true;
+            }
+          }
+        }
+      }
       const auto &argSpec = actArgSpecs.back();
       const auto &arg = std::get<ActualArg>(argSpec.t);
       if (const auto *argExpr =
@@ -2418,6 +2439,7 @@ void FeatureCharacterization::checkAllFeatures() {
   checkMap("Default accessibility for entities accessed from a module");
   checkMap("Implicit none enhancement");
   checkMap("Rules for generic procedures");
+  checkMap("Intrinsic function sign");
   checkMap("Changes to Intrinsics that access the computing environment");
   checkMap("New reduction intrinsic reduce");
   checkMap("Intrinsic function coshape");
