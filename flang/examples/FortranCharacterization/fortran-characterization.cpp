@@ -901,8 +901,10 @@ void FeatureCharacterization::Post(const parser::PointerAssignmentStmt &pas) {
           }
         } else {
 #if PRINT_DEBUG_INFO == 1
-          out_ << "==> [Error on PointerAssignmentStmt] No symbol found for "
-               << tname->ToString() << "\n";
+          if (!disable_semantic_analysis) {
+            out_ << "==> [Error on PointerAssignmentStmt] No symbol found for "
+                 << tname->ToString() << "\n";
+          }
 #endif
         }
       }
@@ -1388,8 +1390,10 @@ void FeatureCharacterization::Post(const parser::Call &c) {
                   const auto scopeName = scope.GetName();
                   if (scopeName.has_value()) {
 #if PRINT_DEBUG_INFO == 1
-                    out_ << "==> scope of symbol for " << tname->ToString()
-                         << " is " << scopeName.value() << "\n";
+                    if (!disable_semantic_analysis) {
+                      out_ << "==> scope of symbol for " << tname->ToString()
+                           << " is " << scopeName.value() << "\n";
+                    }
 #endif
                   }
                   if (ultimate.has<SubprogramDetails>()) {
@@ -1409,8 +1413,11 @@ void FeatureCharacterization::Post(const parser::Call &c) {
               }
             } else {
 #if PRINT_DEBUG_INFO == 1
-              out_ << "==> [Error on actArgSpecs of Call] No symbol found for "
-                   << tname->ToString() << "\n";
+              if (!disable_semantic_analysis) {
+                out_
+                    << "==> [Error on actArgSpecs of Call] No symbol found for "
+                    << tname->ToString() << "\n";
+              }
 #endif
             }
           }
@@ -1906,8 +1913,10 @@ void FeatureCharacterization::Post(const parser::AssignmentStmt &as) {
           }
         } else {
 #if PRINT_DEBUG_INFO == 1
-          out_ << "==> [Error on AssignmentStmt] No symbol found for "
-               << name->ToString() << "\n";
+          if (!disable_semantic_analysis) {
+            out_ << "==> [Error on AssignmentStmt] No symbol found for "
+                 << name->ToString() << "\n";
+          }
 #endif
         }
         CONVERT2LOWERCASE(name->ToString(), nameString);
@@ -2180,8 +2189,10 @@ bool FeatureCharacterization::IsCInteroperableObject(
   // Must be an object, not a procedure, generic, namelist, etc.
   if (!ultimate.detailsIf<semantics::ObjectEntityDetails>()) {
 #if PRINT_DEBUG_INFO == 1
-    out_ << "==> [Error in IsCInteroperableObject] Symbol " << ultimate.name()
-         << " is not an object\n";
+    if (!disable_semantic_analysis) {
+      out_ << "==> [Error in IsCInteroperableObject] Symbol " << ultimate.name()
+           << " is not an object\n";
+    }
 #endif
     return false;
   }
@@ -2189,8 +2200,10 @@ bool FeatureCharacterization::IsCInteroperableObject(
   const semantics::DeclTypeSpec *type = ultimate.GetType();
   if (!type) {
 #if PRINT_DEBUG_INFO == 1
-    out_ << "==> [Error in IsCInteroperableObject] Symbol " << ultimate.name()
-         << " has no declared type\n";
+    if (!disable_semantic_analysis) {
+      out_ << "==> [Error in IsCInteroperableObject] Symbol " << ultimate.name()
+           << " has no declared type\n";
+    }
 #endif
     return false;
   }
@@ -2206,10 +2219,13 @@ bool FeatureCharacterization::IsCInteroperableObject(
     if (const auto *derived = type->AsDerived()) {
       const semantics::Symbol &typeSym = derived->typeSymbol();
 #if PRINT_DEBUG_INFO == 1
-      out_ << "==> [IsCInteroperableObject] Derived type with name="
-           << typeSym.name() << " has attributes: "
-           << (typeSym.attrs().test(semantics::Attr::BIND_C) ? "BIND(C) " : "")
-           << "\n";
+      if (!disable_semantic_analysis) {
+        out_ << "==> [IsCInteroperableObject] Derived type with name="
+             << typeSym.name() << " has attributes: "
+             << (typeSym.attrs().test(semantics::Attr::BIND_C) ? "BIND(C) "
+                                                               : "")
+             << "\n";
+      }
 #endif
       return typeSym.attrs().test(semantics::Attr::BIND_C);
     }
@@ -2220,10 +2236,12 @@ bool FeatureCharacterization::IsCInteroperableObject(
         evaluate::IsInteroperableIntrinsicType(dynamicType);
     if (interoperable.has_value()) {
 #if PRINT_DEBUG_INFO == 1
-      out_ << "==> [IsCInteroperableObject] Intrinsic type with dynamic type "
-           << dynamicType.AsFortran() << " is "
-           << (interoperable.value() ? "interoperable" : "not interoperable")
-           << "\n";
+      if (!disable_semantic_analysis) {
+        out_ << "==> [IsCInteroperableObject] Intrinsic type with dynamic type "
+             << dynamicType.AsFortran() << " is "
+             << (interoperable.value() ? "interoperable" : "not interoperable")
+             << "\n";
+      }
 #endif
       return interoperable.value();
     }
@@ -2231,9 +2249,11 @@ bool FeatureCharacterization::IsCInteroperableObject(
   }
 
 #if PRINT_DEBUG_INFO == 1
-  out_ << "==> [Error in IsCInteroperableObject] Could not evaluate dynamic "
-          "type of "
-       << ultimate.name() << "\n";
+  if (!disable_semantic_analysis) {
+    out_ << "==> [Error in IsCInteroperableObject] Could not evaluate dynamic "
+            "type of "
+         << ultimate.name() << "\n";
+  }
 #endif
   return false;
 }

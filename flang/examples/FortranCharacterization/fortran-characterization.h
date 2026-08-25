@@ -353,6 +353,8 @@ class FeatureListAction : public PluginParseTreeAction {
     if (disableSemanticAnalysis &&
         std::string{disableSemanticAnalysis} == "1") {
       FeatureCharacterization::disable_semantic_analysis = true;
+      llvm::outs() << "Semantic analysis disabled due to "
+                      "FF_DISABLE_SEMANTIC_ANALYSIS=1\n";
     } else {
       FeatureCharacterization::disable_semantic_analysis = false;
     }
