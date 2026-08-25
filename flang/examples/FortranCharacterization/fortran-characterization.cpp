@@ -499,16 +499,7 @@ void FeatureCharacterization::checkDeclarationTypeSpec(
           const auto &typeParamV =
               std::get<std::optional<parser::TypeParamValue>>(lk->t);
           if (typeParamV.has_value()) {
-            if (const auto *const sie{std::get_if<parser::ScalarIntExpr>(
-                    &typeParamV.value().u)}) {
-              const auto &lenExp{sie->thing.thing.value()};
-              if (const auto *const lc{
-                      std::get_if<parser::LiteralConstant>(&lenExp.u)}) {
-                if (const auto *const ilc{
-                        std::get_if<parser::IntLiteralConstant>(&lc->u)}) {
-                }
-              }
-            } else if (std::get_if<parser::Star>(&typeParamV.value().u)) {
+            if (std::get_if<parser::Star>(&typeParamV.value().u)) {
               if (is_in_c_binding_procedure) {
                 features["C descriptors"] = true;
                 features["Attribute codes"] = true;

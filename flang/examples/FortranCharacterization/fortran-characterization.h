@@ -8,25 +8,18 @@
  * - I will need to overwrite the Pre and Post functions though
  */
 
-#include "flang/Common/idioms.h"
-#include "flang/Common/indirection.h"
-#include "flang/Frontend/CompilerInstance.h"
 #include "flang/Frontend/FrontendActions.h"
 #include "flang/Frontend/FrontendPluginRegistry.h"
-#include "flang/Parser/format-specification.h"
 #include "flang/Parser/parse-tree-visitor.h"
 #include "flang/Parser/parse-tree.h"
 #include "flang/Parser/parsing.h"
-#include "flang/Parser/tools.h"
 #include "flang/Parser/unparse.h"
 #include "flang/Semantics/semantics.h"
 #include "flang/Semantics/symbol.h"
 #include "flang/Semantics/tools.h"
-#include "flang/Support/Fortran.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdlib>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 
