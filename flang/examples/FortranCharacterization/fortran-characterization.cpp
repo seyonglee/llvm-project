@@ -177,6 +177,8 @@ std::unordered_set<std::string>
 // ASSOCIATE, BLOCK, WHERE
 std::unordered_set<std::string> FeatureCharacterization::executable_constructs;
 
+bool FeatureCharacterization::disable_semantic_analysis = false;
+
 bool FeatureCharacterization::use_iso_Fortran_env = false;
 
 bool FeatureCharacterization::is_in_c_binding_procedure = false;
@@ -668,7 +670,8 @@ void FeatureCharacterization::Post(const parser::TypeDeclarationStmt &tds) {
     auto const &entityName{std::get<ObjectName>(ed.t)};
     CONVERT2LOWERCASE(entityName.ToString(), enString);
     const Symbol *sym = entityName.symbol;
-    if ((pointerAttr || allocatableAttr) && IsLocalVariable(*sym)) {
+    if ((sym != nullptr) && (pointerAttr || allocatableAttr) &&
+        IsLocalVariable(*sym)) {
       if (!saveAttr) {
         features["Automatic deallocation of allocatable arrays"] = true;
       }
@@ -939,22 +942,24 @@ void FeatureCharacterization::Post(const parser::Call &c) {
       features["New and enhanced intrinsic procedures"] = true;
     } else if (fnName == "sign") {
       if (actArgSpecs.size() == 2) {
-        auto argSpec{actArgSpecs.begin()};
-        const auto &firstArg{std::get<ActualArg>(argSpec->t)};
-        const auto &secondArg{std::get<ActualArg>((++argSpec)->t)};
-        const auto *firstArgExpr{
-            std::get_if<common::Indirection<Expr>>(&firstArg.u)};
-        const auto *secondArgExpr{
-            std::get_if<common::Indirection<Expr>>(&secondArg.u)};
-        if (firstArgExpr && secondArgExpr) {
-          const auto *firstTypedExpr{GetExpr(firstArgExpr->value())};
-          const auto *secondTypedExpr{GetExpr(secondArgExpr->value())};
-          if (firstTypedExpr && secondTypedExpr) {
-            const auto firstType{firstTypedExpr->GetType()};
-            const auto secondType{secondTypedExpr->GetType()};
-            if (firstType && secondType &&
-                firstType->kind() != secondType->kind()) {
-              features["Intrinsic function sign"] = true;
+        if (!disable_semantic_analysis) {
+          auto argSpec{actArgSpecs.begin()};
+          const auto &firstArg{std::get<ActualArg>(argSpec->t)};
+          const auto &secondArg{std::get<ActualArg>((++argSpec)->t)};
+          const auto *firstArgExpr{
+              std::get_if<common::Indirection<Expr>>(&firstArg.u)};
+          const auto *secondArgExpr{
+              std::get_if<common::Indirection<Expr>>(&secondArg.u)};
+          if (firstArgExpr && secondArgExpr) {
+            const auto *firstTypedExpr{GetExpr(firstArgExpr->value())};
+            const auto *secondTypedExpr{GetExpr(secondArgExpr->value())};
+            if (firstTypedExpr && secondTypedExpr) {
+              const auto firstType{firstTypedExpr->GetType()};
+              const auto secondType{secondTypedExpr->GetType()};
+              if (firstType && secondType &&
+                  firstType->kind() != secondType->kind()) {
+                features["Intrinsic function sign"] = true;
+              }
             }
           }
         }
@@ -1356,7 +1361,8 @@ void FeatureCharacterization::Post(const parser::Call &c) {
   if (const auto *procCompRef{std::get_if<ProcComponentRef>(&pd.u)}) {
     const auto *typeBoundProcSym{procCompRef->v.thing.Component().symbol};
     bool isInaccessibleDeferred{false};
-    if (semantics::FindOverriddenBinding(
+    if ((typeBoundProcSym != nullptr) &&
+        semantics::FindOverriddenBinding(
             *typeBoundProcSym, isInaccessibleDeferred)) {
       features["Overriding a type-bound procedure"] = true;
     }

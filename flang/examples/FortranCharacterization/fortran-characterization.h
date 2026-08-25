@@ -24,6 +24,7 @@
 #include "flang/Semantics/tools.h"
 #include "flang/Support/Fortran.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cstdlib>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -54,6 +55,8 @@ public:
   template <typename T> void Post(const T &x) {}
 
   void checkAllFeatures();
+
+  static bool disable_semantic_analysis;
 
   static std::vector<std::string> Fortran_intrinsic_modules;
 
@@ -194,7 +197,6 @@ public:
   // - Optional back argument added to maxloc and minloc (Fortran 2008)
   // - Initialization of pointers with NULL function
   // - New and enhanced intrinsic procedures
-  //   TODO: handle SIGN() function.
   // - Compiler information in ISO_FORTRAN_ENV (Fortran 2008)
   // - Function for C sizeof (Fortran 2008)
   // - Assumed rank (Fortran 2018)
@@ -345,11 +347,19 @@ class FeatureListAction : public PluginParseTreeAction {
     visitor.checkAllFeatures();
   }
 
-  // don't need to override beginSourceFileAction because it already does
-  // what we want
   bool beginSourceFileAction() override {
+    const char *disableSemanticAnalysis =
+        std::getenv("FF_DISABLE_SEMANTIC_ANALYSIS");
+    if (disableSemanticAnalysis &&
+        std::string{disableSemanticAnalysis} == "1") {
+      FeatureCharacterization::disable_semantic_analysis = true;
+    } else {
+      FeatureCharacterization::disable_semantic_analysis = false;
+    }
     return runPrescan() && runParse(/*emitMessages=*/true) &&
-        runSemanticChecks();
+        (FeatureCharacterization::disable_semantic_analysis
+                ? true
+                : runSemanticChecks());
   }
 };
 
